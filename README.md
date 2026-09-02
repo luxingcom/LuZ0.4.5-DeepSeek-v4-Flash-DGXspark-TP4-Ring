@@ -6,7 +6,37 @@
 
 **变更记录**：见 [`CHANGES-2026-09-02.md`](CHANGES-2026-09-02.md)（G1r5 全量重测 / G1r6 三窗口 / TILE_CAP=0 采纳 / W9R13 工具调用修复 / 超时守卫 / 热安全解除 / 定版）。
 
-**最终性能指标**：见 `docs/03-final-metrics/`（完整 benchmark 后填充）。
+**最终性能指标**：见下方「典型性能指标」与 **[FINAL-METRICS 完整测试报告](docs/03-final-metrics/FINAL-METRICS-2026-09-02.md)**。
+
+---
+
+## 📊 典型性能指标（冷数据口径 · 前缀缓存关闭 · 3 波中位）
+
+> 完整 48 格矩阵（DE 18 + PR 30）、原始数据与口径说明见 **[FINAL-METRICS 完整测试报告](docs/03-final-metrics/FINAL-METRICS-2026-09-02.md)**。
+
+| 指标 | 结果 | 备注 |
+|---|---|---|
+| DE C1 prefill | **1841–1862 tps** | coding/json/prose 三型近一致 |
+| DE C1 decode | ~102 / ~106 / ~49 t/s | coding / json / prose |
+| PR prefill 峰值 | **PR2048 C1 ≈ 2748 tps** | 规模化拐点前峰值 |
+| PR TTFT 线性 | 512→131K：**0.25s→48.8s**（C1） | ~190× 前缀 / ~195× TTFT，无异常拐点 |
+| PR131K 全并发 6 格 | C1=2362 → C12=361（C12 TTFT 324.7s） | uuid 冷算 |
+| PR400K C2（更大压力） | prefill **921.5 tps** / TTFT **381.9s** | 2200MHz 制，3 波中位 |
+| GSM8K 全量（1319 题） | **content 0.9363 / marker 0.9371** | 双项 ≥0.930 门 **PASS** |
+
+*口径注：完整矩阵（DE/PR）为 2400MHz 制；PR400K C2 与 GSM8K 为 2200MHz 制（2026-09-02 深夜散热降频修复后，详见 FINAL-METRICS §0）。*
+
+**结构化数据**：`data/final-metrics-matrix-045.json`（48 格全量）+ `data/final-metrics-ext-045.json`（PR400K C2 扩展档）
+
+---
+
+## 📥 镜像下载
+
+- **脱敏检查点镜像**：`luz045-checkpoint-redacted-2026-09-02.tar.gz`（零权重/零密钥）
+  - 百度网盘：<https://pan.baidu.com/s/1PsljdGBfOwCv2c0vcf0mWw?pwd=luzi>（提取码：`luzi`）
+  - 部署/校验指引：见 [`docs/07-deployment/image-redaction-delivery-2026-09-02.md`](docs/07-deployment/image-redaction-delivery-2026-09-02.md)
+
+---
 
 ## 目录结构
 
@@ -28,11 +58,13 @@ data/                       基准原始数据（json/csv）
 
 ## 快速导航
 
+- **📊 完整测试报告**：`docs/03-final-metrics/FINAL-METRICS-2026-09-02.md`（48 格矩阵 + PR400K C2 + GSM8K 全量，冷数据口径）
 - **定版报告**：`docs/07-deployment/g1r6-release-finalization-2026-09-02.md`（G1r6→LuZ0.4.5 定版 + 活性探针关闭）
 - **G1r6 三窗口评估**：`docs/02-performance-benchmarks/g1r6-experiment-benchmark-2026-09-02.md`（TILE_CAP=0 采纳 / B1 降级 / autotune 固化）
 - **G1r5 全量重测**：`docs/02-performance-benchmarks/g1r5-full-benchmark-2026-09-02.md`
 - **工具调用 bug 根因**：`docs/04-issues/bug-tool-call-encoding-2026-09-02.md`（W9R13，多用户 agent 触发）
 - **超时守卫 + CUDA 图预热**：`docs/04-issues/timeout-guard-cudagraph-warmup-2026-09-02.md`
+- **RoCE GID 隐患排查**：`docs/04-issues/roce-gid-index3-zero-fault-2026-09-03.md`（对端断电→NM 撤 IP→GID 全零→NCCL 建链失败，gid_preflight 固化）
 - **检查点准备（autotune 内置）**：`docs/07-deployment/checkpoint-luz045-autotune-baked-2026-09-02.md`（W9R14）
 - **镜像脱敏分发**：`docs/07-deployment/image-redaction-delivery-2026-09-02.md`
 - **脱敏映射**：`REDACTION-MAP.md`
