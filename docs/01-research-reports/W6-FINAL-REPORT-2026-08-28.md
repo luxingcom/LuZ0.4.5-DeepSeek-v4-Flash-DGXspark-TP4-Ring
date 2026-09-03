@@ -48,10 +48,10 @@
 | a7 | 脚本回 -e 循环但 env 忘回 27 行 | 🔴 同位置 | 真凶 = 27 行新增 NCCL 项 | **重大发现：EngineCore 层 env 不被洗** |
 | a8（r10） | ringonly 库入镜像 + conf 16 键 + PID1 LD_PRELOAD | 🔴 "Failed to initialize any NET plugin" | NET 层未通 | **切库实证落地**（deep_ep "Duplicate NCCL runtime" 双运行时证据）；三铁证未取得（未达 ready），**maps 直接取证待验（需集群 serving 态）** |
 | a9（r10c） | env+conf 双层删 NET=IB + SOCKET_IFNAME→rocep1s0f0 | 🔴 bootstrap "no socket interface found" | **NET 层已过**；HCA 名 ≠ netdev 名 | NET→bootstrap 推进一格 |
-| a10（r10d） | SOCKET_IFNAME→四真实 10.100 netdev | 🟡 NOT READY @ head 侧 shm_broadcast 悬置 >10min（每 60s 重试，非 collective 阶段 timeout 不触发） | —— | **NCCL 全判据历史性通过**（Follower 3/3 / SPARSE_SWA / DEEPGEMM / bootstrap / NET 全清零）；唯一悬置转 shm |
+| a10（r10d） | SOCKET_IFNAME→四真实 <RING_SUBNET> netdev | 🟡 NOT READY @ head 侧 shm_broadcast 悬置 >10min（每 60s 重试，非 collective 阶段 timeout 不触发） | —— | **NCCL 全判据历史性通过**（Follower 3/3 / SPARSE_SWA / DEEPGEMM / bootstrap / NET 全清零）；唯一悬置转 shm |
 | a11 | **未发生** | —— | shm 诊断证伪：脚本已设 32g = 要求 2 倍，生产 64g | 记录为"证伪后不执行" |
 
-**攻坚主线逻辑**：env 注入（a5~a7 死于白名单 17/20）→ conf 文件 + PID1 LD_PRELOAD 双层穿透（a8 切库落地、死于 NET plugin）→ 删 NET=IB 改真实 netdev（a9 NET 过、死于 bootstrap 接口名）→ 四真实 10.100 netdev（a10 NCCL 全过、悬置 shm）。
+**攻坚主线逻辑**：env 注入（a5~a7 死于白名单 17/20）→ conf 文件 + PID1 LD_PRELOAD 双层穿透（a8 切库落地、死于 NET plugin）→ 删 NET=IB 改真实 netdev（a9 NET 过、死于 bootstrap 接口名）→ 四真实 <RING_SUBNET> netdev（a10 NCCL 全过、悬置 shm）。
 
 ---
 
@@ -80,7 +80,7 @@
 | r10 | 2d3a9bb0 | ringonly 库 + conf 16 键 + PID1 LD_PRELOAD | a8 切库落地 / NET plugin FAIL |
 | r10b | 2ba9bb88 | **仅删 conf NET=IB，env 未同步故无效** | **二分实际触发**（13:05 线内） |
 | r10c | d6465d44 | env+conf 双层删 NET=IB + SOCKET_IFNAME→rocep1s0f0 | a9 NET 过 / bootstrap FAIL |
-| r10d | b95a016e | SOCKET_IFNAME→四真实 10.100 netdev | a10 NCCL 全判据过 / shm 悬置 |
+| r10d | b95a016e | SOCKET_IFNAME→四真实 <RING_SUBNET> netdev | a10 NCCL 全判据过 / shm 悬置 |
 
 **w3_run.sh .bak 链**：r8pin / r9pin / r10pin / r10b / r10c / r10d + envfix / ncclfix / envfix2 / envfix3 —— 全链留存可回溯。
 
@@ -91,7 +91,7 @@
 1. **stock vLLM worker 的 NCCL env 白名单清洗：17/20 项被洗。** a5 proc/1 全量取证实锤（worker 连 NCCL_DEBUG=INFO 都被洗）。env 注入类方案全数死于此——不是 NCCL 配错，是配置根本没到达进程。
 2. **EngineCore 层不洗。** a7 对照实验发现；反推  (node03 管理网末段) 泄漏 EngineCore（pid 3155709, 5750MiB）身份语义为 EngineCore 侧残留，T2 已核身份清理，恢复后须复检（铁证⑦）。
 3. **生产从未挂 infiniband 设备 → NCCL_NET=IB 在生产从未真实行使。** 诚实账：ringonly RDMA 数据面形态判定为"生产本就不存在"；本窗实证仅证明"注入通路可达"，不证明"恢复了生产行为"。
-4. **rdma HCA 名 ≠ netdev 名。** NCCL_NET 匹配对象是 netdev；a9 的 rocep1s0f0 死点即此——须填四真实 10.100 netdev（a10 验证通过）。
+4. **rdma HCA 名 ≠ netdev 名。** NCCL_NET 匹配对象是 netdev；a9 的 rocep1s0f0 死点即此——须填四真实 <RING_SUBNET> netdev（a10 验证通过）。
 5. **（新增）shm_broadcast 非 collective 阶段 timeout 不触发**：head 侧每 60s 重试可无限悬置，守门判读须以"NOT READY 持续时长"而非 timeout 报错为准。
 
 ---
@@ -128,7 +128,7 @@
 |---|------|------|
 | ① | 四机 `grep -c ringonly /proc/<pid>/maps` ≥1 | 每机逐项 ✅/🔴 |
 | ② | NCCL version banner | ✅/🔴 |
-| ③ | 数据面 `ss` 见 10.100/10.20 网段 | ✅/🔴 |
+| ③ | 数据面 `ss` 见 <RING_SUBNET> 网段 | ✅/🔴 |
 | ④ | health=200@8013 | ✅/🔴 |
 | ⑤ | **铁证原文：rank0 = anemll/dspark-vllm-gx10:0.2.1-v026.0**（0.26 fork，非 sm121a 谱系） | ✅ |
 | ⑥ | **铁证原文： (node02 管理网末段) vllm028-rb Up 24h 未动； (node03 管理网末段)/ (node04 管理网末段) embed-8022 Up** | ✅（诚实记档见下） |

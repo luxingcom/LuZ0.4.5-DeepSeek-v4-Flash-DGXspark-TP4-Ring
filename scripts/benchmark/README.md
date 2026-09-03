@@ -27,7 +27,7 @@ LuZ0.4.5 基准测试工具链（脱敏版）。完整口径说明见 [FINAL-MET
 | 占位符 | 含义 | 示例替换 |
 |---|---|---|
 | `_PH_NODE_IP_` | 引擎节点 IP | `127.0.0.1` 或实际节点 IP |
-| `_PH_HEAD_IP_` | 管理网前三段（gid_preflight 四机数组） | `192.168.x` |
+| `_PH_HEAD_IP_` | 管理网前三段（gid_preflight 四机数组） | 实际管理网网段 |
 | `_PH_USER_` | ssh/路径用户名 | `ubuntu` |
 | `_PH_USER_KIT_` | 工具目录 | `$HOME/w6-kit` |
 | `_PH_BAKE_IMAGE_DIGEST_` | 镜像 digest 标注 | 任意标注字符串 |

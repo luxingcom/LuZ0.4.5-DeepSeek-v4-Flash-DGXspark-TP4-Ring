@@ -1,18 +1,39 @@
 {
   "image": "LuZ0.4.5-DeepSeek-v4-Flash-DGXspark-TP4-Ring-baked",
-  "digest": "153e31d2",
+  "digest": "_PH_BAKE_IMAGE_DIGEST_",
   "generated": "2026-09-03 01:10 CST",
   "clock_note": "matrix=2400MHz (gb10-clock-cap); ext/gsm8k=2200MHz (2026-09-02 thermal fix)",
   "pr400k_c2": {
     "mode": "conc=2, prefix-len 400000, output-len 1, uuid-prefix cold, 3-round median",
     "rounds": {
-      "r1": {"prefill_tps": 921.25, "ttft_s": 381.8585, "ok": 2},
-      "r2": {"prefill_tps": 926.88, "ttft_s": 379.7754, "ok": 2},
-      "r3": {"prefill_tps": 921.5,  "ttft_s": 382.1925, "ok": 2}
+      "r1": {
+        "prefill_tps": 921.25,
+        "ttft_s": 381.8585,
+        "ok": 2
+      },
+      "r2": {
+        "prefill_tps": 926.88,
+        "ttft_s": 379.7754,
+        "ok": 2
+      },
+      "r3": {
+        "prefill_tps": 921.5,
+        "ttft_s": 382.1925,
+        "ok": 2
+      }
     },
-    "median": {"prefill_tps": 921.5, "ttft_s": 381.86, "ok": "2/2/2"},
+    "median": {
+      "prefill_tps": 921.5,
+      "ttft_s": 381.86,
+      "ok": "2/2/2"
+    },
     "note": "2200MHz, engine stable after GID fix; thermal 76-89C peak no alert",
-    "c1_reference": {"prefill_tps": 1682, "ttft_s": 209.4, "clock": "2400MHz", "note": "r1 only, 03 power-cut during r2/r3"}
+    "c1_reference": {
+      "prefill_tps": 1682,
+      "ttft_s": 209.4,
+      "clock": "2400MHz",
+      "note": "r1 only, 03 power-cut during r2/r3"
+    }
   },
   "gsm8k_full": {
     "nq_total": 1319,
@@ -25,22 +46,41 @@
     "gate_pass_0p930_marker": true,
     "anchor_upstream_0p9492": true,
     "segments": {
-      "segA": {"nq": 114, "accuracy_content": 0.9474, "correct_content": 108},
-      "segB": {"nq": 1205, "accuracy_content": 0.9353, "correct_content": 1127, "accuracy_marker": 0.9361, "correct_marker": 1128}
+      "segA": {
+        "nq": 114,
+        "accuracy_content": 0.9474,
+        "correct_content": 108
+      },
+      "segB": {
+        "nq": 1205,
+        "accuracy_content": 0.9353,
+        "correct_content": 1127,
+        "accuracy_marker": 0.9361,
+        "correct_marker": 1128
+      }
     },
-    "config": {"temperature": 0.6, "shots": 8, "max_tokens": 1024, "concurrency": 1},
+    "config": {
+      "temperature": 0.6,
+      "shots": 8,
+      "max_tokens": 1024,
+      "concurrency": 1
+    },
     "ts_merged": "2026-09-02 17:05:06 UTC"
   },
   "gid_preflight": {
     "issue": "peer power-cut -> NM drops static IP -> RoCE GID idx3 zero -> NCCL link fail (ibv_modify_qp errno 61, local GID ::)",
     "script": "/opt/_PH_INSTALL_/scripts/gid_preflight.sh",
-    "integrated": ["healthcheck-rebuild.sh", "monitor_tp4_head_v043.sh", "monitor_tp4_worker_v043.sh"],
+    "integrated": [
+      "healthcheck-rebuild.sh",
+      "monitor_tp4_head_v043.sh",
+      "monitor_tp4_worker_v043.sh"
+    ],
     "doc": "docs/04-issues/roce-gid-index3-zero-fault-2026-09-03.md",
     "status": "all 4 nodes 8 ports GID OK"
   },
   "ncclpin_v9": {
     "status": "applied & verified",
-    "host_lib_md5": "69f20139c993f019742966f8a31976e9",
+    "host_lib_md5": "<HASH>",
     "v8_backup": ".bak-v8-20260903",
     "mount": "-v /opt/_PH_INSTALL_/lib/libncclpin.so:/opt/libncclpin.so:ro",
     "verify": "pt_nccl_watchdg/pt_nccl_heartbt/pt_tcpstore_uv -> CPU 8-9 (isolated) on all 4 nodes",
