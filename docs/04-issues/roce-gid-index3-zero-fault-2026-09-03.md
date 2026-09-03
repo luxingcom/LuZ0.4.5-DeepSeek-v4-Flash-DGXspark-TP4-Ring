@@ -47,7 +47,7 @@
   RuntimeError: Worker failed ... NCCL unhandled system error
   Call to ibv_modify_qp failed with 61 No data available,
   on dev rocep1s0f0:1, curr state INIT→RTR, local GID ::          ← GID 为空
-  remote GID RING_IP_REDACTED
+  remote GID ::ffff:<RING_SUBNET>.2
   ```
 - **波及范围**：15:30 后的拉起循环（healthcheck 15:31 触发重建、worker systemd 反复重启：02/03/04 各 4 次、01 两次）全部死在同一处——02/03/04 容器一直 healthy 干等，rank0 每次初始化到 NCCL 建链就崩。
 - **次要因素（非主因）**：①03/04 重启时间差导致 rendezvous 凑不齐；②03 在 15:04 有一次 NVRM 显存分配失败（换代初始化的已知内存边界特性）。
@@ -59,7 +59,7 @@
 3. 容器层：`docker logs` 见 `Engine core initialization failed` + `ibv_modify_qp errno 61`
 4. **转折点**：检查 RoCE GID 表 → 01 的 `rocep1s0f0` GID index3 全零（其他三机 idx3 均有效）
 5. 复核：接口 down/up 无法重建 GID 布局（驱动注册固有布局）；`nmcli reapply` 不刷新 NM 记账
-6. 修复：`nmcli device disconnect + connect` 硬复位 → IP 回来、GID 恢复（`RING_IP_REDACTED / 141.1`）、绑定口 ping 通 → 15:48 systemd 自然拉起 → 15:54 health=200，四机 healthy 稳定至今
+6. 修复：`nmcli device disconnect + connect` 硬复位 → IP 回来、GID 恢复（`::ffff:<RING_SUBNET>.1 / <RING_SUBNET>.2`）、绑定口 ping 通 → 15:48 systemd 自然拉起 → 15:54 health=200，四机 healthy 稳定至今
 
 > **教训**：NCCL 建链失败 ≠ NCCL/驱动问题。`ibv_modify_qp errno 61` + `local GID ::` 是 RoCE GID 空洞的**独有指纹**，必须最先排除。
 
@@ -93,7 +93,7 @@
 ### 3.3 落地验证
 
 - 四机 8 个 RoCE 口 `gids/3` 巡检：**全部 [OK]**（IPv4-mapped 有效 GID）
-- 修复前 01 两个口 index3 全零（`0000:...:0000`）→ 修复后 `RING_IP_REDACTED / 141.1`
+- 修复前 01 两个口 index3 全零（`0000:...:0000`）→ 修复后 `::ffff:<RING_SUBNET>.1 / <RING_SUBNET>.2`
 - 三个自愈脚本 `bash -n` 语法通过，集成点确认在拉起/重建动作之前
 
 ## 4. 诊断口诀与预防清单

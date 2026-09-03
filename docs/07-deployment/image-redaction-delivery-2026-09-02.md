@@ -23,7 +23,7 @@
 |---|---|---|
 | `/root/.cache/pip`（含 http-v2 缓存） | 删除 | pip 下载缓存，含 URL 元数据 |
 | `/opt/uv/cache`（694MB） | 删除 | uv 构建缓存（nvidia 源码包等） |
-| `/etc/resolv.conf` 内网 nameserver | 重置为通用 `search .` | 原含 `NODE_IP_REDACTED`（运行时 Docker 注入，重写为通用） |
+| `/etc/resolv.conf` 内网 nameserver | 重置为通用 `search .` | 原含 `<NODE_IP>`（运行时 Docker 注入，重写为通用） |
 | `/etc/hosts` | 重置为标准 localhost | 原含容器 IP |
 | `/etc/hostname` | 清空 | 原为容器 ID |
 | `/tmp` 全部残留 | 清空 | 验证脚本/编译临时/cutlass cache |
@@ -31,7 +31,7 @@
 
 ### 1.2 扫描验证（复扫证据）
 
-- **敏感模式扫描**（`MGMT_SUBNET_REDACTED` / `<USER>` / `AS1217` / `dgxspark` / `10.100` / `10.20` / `172.17`）：**文本文件零残留**（dpkg md5sums/许可证中的版本号如 `libavfilter.so.7.110.100` 为误报，已人工核验非 IP）
+- **敏感模式扫描**（管理网段 / `<USER>` / 口令前缀 / 主机名前缀 / RoCE 环网段 / 内部网段 / 本地网段）：**文本文件零残留**（dpkg md5sums/许可证中的版本号如 `libavfilter.so.7.110.100` 为误报，已人工核验非 IP）
 - **镜像 Config 检查**：ENV/Labels 无敏感（`VLLM_IMAGE_TAG=local/vllm-openai:dev`、构建元数据均 local/unknown；`org.opencontainers.image.source` 为公开上游 github/anemll/dspark-vllm-gx10）；Volumes=null
 - **/opt**：仅编译库（libncclpin.so / nccl-ringonly / wheels / uv），无脚本/配置含敏感
 
