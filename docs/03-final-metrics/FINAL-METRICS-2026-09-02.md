@@ -1,6 +1,6 @@
 # FINAL-METRICS — LuZ0.4.5 完整基准矩阵（2026-09-02）
 
-> 交付：LuZ0.4.5-DeepSeek-v4-Flash-DGXspark-TP4-Ring-baked（digest 153e31d2，autotune 内置）
+> 交付：LuZ0.4.5-DeepSeek-v4-Flash-DGXspark-TP4-Ring-baked（digest _PH_BAKE_IMAGE_DIGEST_，autotune 内置）
 > 镜像形态基线：W4A4 full（`VLLM_MOE_W4A4=2`）+ CUDA Graph + 池补丁 + FlashInfer 0.6.18 + `--moe-backend flashinfer_b12x` + TILE_CAP=0 + autotune 手动固化 + util 0.80 + DSpark MTP n7
 > 本文件为 v2：完整矩阵（48 格）+ PR400K C2 + GSM8K 全量已全部落盘（2026-09-03 01:xx 最终版）。
 
@@ -22,7 +22,7 @@
 
 | 项 | 结论 |
 |---|---|
-| 完整矩阵 | ✅ 48/48（DE 18 + PR 30），3 波中位一致性好（±3% 内）|
+| 完整矩阵 | ✅ 48/48（DE 18 + PR 30），3 波中位：PR/DE C1-C2 档一致性好（±3% 内）；C4+ 高并发档与个别格波间波动更大（最大 ~55%，DE_coding_C4 prefill），由中位法兜底 |
 | DE C1 | decode coding **~102 t/s** / json ~106 / prose ~49；prefill 1841-1862 tps；TTFT 0.31-0.32s |
 | DE 规模化 | C1→C12 decode 降至 32-44（coding）/16-35（prose），TTFT 0.32s→1.7s |
 | PR prefill 峰值 | **PR2048 C1 ≈ 2748 tps**（规模化拐点前峰值）|
@@ -92,7 +92,7 @@
 
 ## 4. PR400K
 
-- **C1（首轮，2400 制）**：⚠️ 03 号机（188/rank3）跑至 r2/r3 时**自动断电重启**（uptime 11min 实锤）→ 仅 r1 有效：prefill 1682 / TTFT **209.4s** / ok=1；r2 ok=0、r3 calib 500
+- **C1（首轮，2400 制）**：⚠️ 03 号机（node03/<MGMT_OCTET>/rank3）跑至 r2/r3 时**自动断电重启**（uptime 11min 实锤）→ 仅 r1 有效：prefill 1682 / TTFT **209.4s** / ok=1；r2 ok=0、r3 calib 500
 - **C2（重跑，2200 制，督导指定更大压力）**：conc=2 / prefix 400000 / output-len 1 / uuid-prefix 冷算 / 3 波中位；引擎稳定（GID 修复 + 降频后未再崩）
 
 | 波次 | prefill (tps) | TTFT (s) | ok |
@@ -102,7 +102,7 @@
 | r3 | 921.5 | 382.19 | 2/2 |
 | **中位** | **921.5** | **381.86** | — |
 
-- **解读**：C2 双并发下 prefill ≈ 922 tps（vs C1 2400 制 1682 tps，-45% 符合 2× 并发 prefill 带宽共享）；TTFT ≈ 382s（vs C1 209s，+82% 排队预期）。**2200 制下满载温度 76-89°C（188 峰值 89°C），全程未超 93°C 告警线，未再断电。**
+- **解读**：C2 双并发下 prefill ≈ 922 tps（vs C1 2400 制 1682 tps，-45% 符合 2× 并发 prefill 带宽共享）；TTFT ≈ 382s（vs C1 209s，+82% 排队预期）。**2200 制下满载温度 76-89°C（node03 峰值 89°C），全程未超 93°C 告警线，未再断电。**
 - **状态**：✅ 完成
 
 ## 5. GSM8K 全量（1319 题，门 ≥0.930）
@@ -156,7 +156,7 @@
 
 - `data/final-metrics-matrix-045.json` — 48 格全量（rounds + 中位）
 - `data/final-metrics-matrix-045.csv` — 48 格主表
-- 服务器原始日志：`/home/liuxiaoya/bench3-results/full-matrix-045/matrix_nohup.log`（含 CELL_RESULT 48 条）
+- 服务器原始日志：`/home/<USER>/bench3-results/full-matrix-045/matrix_nohup.log`（含 CELL_RESULT 48 条）
 - 命中率实证：metrics `prefix_cache_hits=0 / queries>0`（冷数据口径）
 
 ---

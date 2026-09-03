@@ -87,7 +87,7 @@
 | `monitor_tp4_worker_v043.sh` | `start_tp4_worker_v043.sh` 前 | 每台 worker 拉起前自查 |
 
 - 预检为 `--fix` 模式：发现空 GID 自动 `nmcli` 复位后再拉起；复位后仍异常则告警并继续（可能非 GID 根因）
-- 配套：`/etc/sudoers.d/99-gid-preflight` 授予 `liuxiaoya` **仅 nmcli** 的 NOPASSWD（最小权限，`visudo -c` 校验通过），使自愈链可无交互自动修复
+- 配套：`/etc/sudoers.d/99-gid-preflight` 授予 `<USER>` **仅 nmcli** 的 NOPASSWD（最小权限，`visudo -c` 校验通过），使自愈链可无交互自动修复
 - 幂等：脚本已含 `gid_preflight` 标记，重复执行不重复插入
 
 ### 3.3 落地验证
@@ -124,6 +124,6 @@ bash /opt/_PH_INSTALL_/scripts/gid_preflight.sh --all --fix
 |------|------|------|
 | `gid_preflight.sh` | 四机 `/opt/_PH_INSTALL_/scripts/` | 新增预检脚本（含根因注释 + 诊断口诀） |
 | `healthcheck-rebuild.sh` | 四机 `/opt/_PH_INSTALL_/scripts/` | 已集成预检（docker rm 前） |
-| `monitor_tp4_head_v043.sh` | 01 `/home/liuxiaoya/w6-kit/` | 已集成预检（start 前） |
-| `monitor_tp4_worker_v043.sh` | 四机 `/home/liuxiaoya/w6-kit/` | 已集成预检（start 前） |
+| `monitor_tp4_head_v043.sh` | 01 `/home/<USER>/w6-kit/` | 已集成预检（start 前） |
+| `monitor_tp4_worker_v043.sh` | 四机 `/home/<USER>/w6-kit/` | 已集成预检（start 前） |
 | `/etc/sudoers.d/99-gid-preflight` | 四机 | NOPASSWD nmcli（最小权限） |

@@ -50,7 +50,7 @@ luz045-github/
 | `<USER>` | 内部用户名 | <USER> |
 | `<HOME_DIR>` / `<MODELS_DIR>` | 目录 | /home/<USER> / <INSTALL_DIR>/models |
 | `<NODE_IP>` | 内网 IP（端口保留） | <NODE_IP><MGMT_OCTET> |
-| `<MGMT_OCTET>` | 管理网末段 | .186/.187/.188/.189 及 ~18x |
+| `<MGMT_OCTET>` | 管理网末段 |  (node01 管理网末段)/ (node02 管理网末段)/ (node03 管理网末段)/ (node04 管理网末段) 及 ~18x |
 | `<RING_SUBNET>` | 环网子网 | 10.100.x/10.20.x 及简写 |
 | `<DOCKER_IP>` | bridge 容器 IP | 172.18.x.x |
 | `REGISTRY_HOST` | 镜像仓库 | REGISTRY_HOST:5000 |

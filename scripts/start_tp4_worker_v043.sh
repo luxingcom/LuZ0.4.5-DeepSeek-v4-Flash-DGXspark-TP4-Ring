@@ -30,7 +30,7 @@ docker run -d --name $NAME --gpus all --privileged --shm-size 64g \
   -e NODE_RANK=$NODE_RANK -e MASTER_ADDR=_PH_NODE_IP_ -e MASTER_PORT=26000 \
   -e VLLM_HOST_IP=$VLLM_HOST_IP \
   -v /opt/_PH_INSTALL_/models/deepseek-v4-flash-0731:/models:ro \
-  -v /opt/_PH_INSTALL_/lib/libncclpin.so:/opt/libncclpin.so:ro \
+  $( [ -f /opt/_PH_INSTALL_/lib/libncclpin.so ] && echo "-v /opt/_PH_INSTALL_/lib/libncclpin.so:/opt/libncclpin.so:ro" ) \
   -v /home/_PH_USER_/vllm-logs:/var/log/vllm \
   -v /home/_PH_USER_/flashinfer-cache:/root/.cache/flashinfer:rw \
   -v /home/_PH_USER_/tilelang-cache:/root/.cache/tilelang:rw \

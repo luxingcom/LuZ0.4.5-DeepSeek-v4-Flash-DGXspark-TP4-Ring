@@ -14,6 +14,9 @@
 # CHANGE: 改脚本须 bash -n + .bak-<tag> 留档 + 更新 REFERENCE.md
 # P2 (2026-08-26): 修复探针误杀——探针失败时先查 8002 HTTP 存活,
 #                 存活=繁忙不重建; 8002 不可达时连续 2 次失败才重建; 健康/重建后清零 failcnt
+# P3 (2026-09-03): 重建前集成 RoCE GID 预检 (gid_preflight.sh, W9R15)——
+#                 对端断电可致本机 GID index3 全零, 重建后 NCCL 建链必败 (errno 61),
+#                 故 docker rm 前先预检, 空 GID 先 --fix 复位再触发重建, 避免重建死循环
 # =============================================================
 set -uo pipefail
 export HOME=/home/_PH_USER_
@@ -39,6 +42,20 @@ SVC="vllm-tp4-worker.service"
 STATE_DIR=_PH_INSTALL_DIR_/state
 mkdir -p "$STATE_DIR" 2>/dev/null || true
 FAIL_STATE="$STATE_DIR/healthcheck-rebuild.$ROLE.failcnt"
+
+# 0. GID 预检 (W9R15): 空 GID 时先复位, 复位失败则放弃本轮重建 (等待下轮重试)
+#    gid_preflight.sh 缺失时跳过预检 (向后兼容, 不阻塞原自愈链)
+GID_SCRIPT=_PH_INSTALL_DIR_/scripts/gid_preflight.sh
+if [ -f "$GID_SCRIPT" ]; then
+  if ! bash "$GID_SCRIPT" >/dev/null 2>&1; then
+    echo "[healthcheck-rebuild][$ROLE] GID 预检异常, 尝试 --fix 复位 (W9R15)"
+    if ! bash "$GID_SCRIPT" --fix >/dev/null 2>&1; then
+      echo "[healthcheck-rebuild][$ROLE] GID 复位失败 => 放弃重建 (NCCL 建链必败, errno 61), 等待下轮" >&2
+      exit 1
+    fi
+    echo "[healthcheck-rebuild][$ROLE] GID 复位成功, 继续重建流程"
+  fi
+fi
 
 # 1. 先跑只读探针
 if bash _PH_INSTALL_DIR_/scripts/healthcheck_hardened.sh --role "$ROLE" --timeout 30 --grace-sec 900; then

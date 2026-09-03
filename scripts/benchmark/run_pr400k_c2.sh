@@ -1,9 +1,10 @@
 #!/bin/bash
 # run_pr400k_c2.sh — PR400K C2 重跑（用户指定: C2 并发更大压力）
-# 背景: 上一轮 PR400K C1 因 03(188,rank3) 断电, r2/r3 失败, 仅 r1 有效 (prefill 1682/TTFT 209s)
+# 背景: 上一轮 PR400K C1 因 node03(<MGMT_OCTET>,rank3) 断电, r2/r3 失败, 仅 r1 有效 (prefill 1682/TTFT 209s)
 # 口径: uuid-prefix 冷算 3 波中位; prefix-len 400000; output-len 1; cooldown 30s; concurrency=2
 # 输出: /home/_PH_USER_/bench3-results/full-matrix-045/PR400K_C2_*
 set -uo pipefail
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 OUT=/home/_PH_USER_/bench3-results/full-matrix-045
 EP="http://_PH_NODE_IP_:8002/v1"
 MODEL="deepseek-v4-flash-0731"
@@ -11,12 +12,12 @@ MODEL="deepseek-v4-flash-0731"
 run_cell () {
   local name=$1 seed=$2 cooldown=$3
   shift 3
-  python3 /opt/_PH_INSTALL_/bench_v2.py --endpoint $EP --key dummy-bench --model $MODEL \
+  python3 "$SCRIPT_DIR/bench_v2.py" --endpoint $EP --key dummy-bench --model $MODEL \
     "$@" --rounds 1 --random-seed $seed --cooldown $cooldown --out "$OUT/${name}_warmup" >> $OUT/run_ext.log 2>&1
   echo "${name}_warmup_exit=$?"
   for r in 1 2 3; do
     local rs=$((seed + r * 1000))
-    python3 /opt/_PH_INSTALL_/bench_v2.py --endpoint $EP --key dummy-bench --model $MODEL \
+    python3 "$SCRIPT_DIR/bench_v2.py" --endpoint $EP --key dummy-bench --model $MODEL \
       "$@" --rounds 1 --random-seed $rs --cooldown $cooldown --out "$OUT/${name}_r$r" >> $OUT/run_ext.log 2>&1
     echo "${name}_r${r}_exit=$?"
   done

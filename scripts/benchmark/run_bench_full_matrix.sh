@@ -5,6 +5,7 @@
 # 扩展档(131K/400K)与 GSM8K 由既有脚本单独跑（run_pr400k_c1.sh / gsm8k_full_g1r5.sh）
 # 用法: bash run_bench_full_matrix.sh [--quick]  (--quick = 跳过 C6/C12 减半时间)
 set -uo pipefail
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 OUT=/home/_PH_USER_/bench3-results/full-matrix-045
 mkdir -p $OUT
 EP="http://_PH_NODE_IP_:8002/v1"
@@ -21,12 +22,12 @@ PR_PREFIX="512 2048 8192 32768 131072"
 run_cell () {
   local name=$1 seed=$2 cooldown=$3
   shift 3
-  python3 /opt/_PH_INSTALL_/bench_v2.py --endpoint $EP --key dummy-bench --model $MODEL \
+  python3 "$SCRIPT_DIR/bench_v2.py" --endpoint $EP --key dummy-bench --model $MODEL \
     "$@" --rounds 1 --random-seed $seed --cooldown $cooldown --out "$OUT/${name}_warmup" >> $OUT/run.log 2>&1
   echo "${name}_warmup_exit=$?"
   for r in 1 2 3; do
     local rs=$((seed + r * 1000))
-    python3 /opt/_PH_INSTALL_/bench_v2.py --endpoint $EP --key dummy-bench --model $MODEL \
+    python3 "$SCRIPT_DIR/bench_v2.py" --endpoint $EP --key dummy-bench --model $MODEL \
       "$@" --rounds 1 --random-seed $rs --cooldown $cooldown --out "$OUT/${name}_r$r" >> $OUT/run.log 2>&1
     echo "${name}_r${r}_exit=$?"
   done
@@ -45,10 +46,10 @@ PYEOF
 }
 
 echo "==== FULL MATRIX start $(date -u) ===="
-echo "IMAGE=LuZ0.4.5-DeepSeek-v4-Flash-DGXspark-TP4-Ring-baked (digest 153e31d2)"
+echo "IMAGE=LuZ0.4.5-DeepSeek-v4-Flash-DGXspark-TP4-Ring-baked (digest _PH_BAKE_IMAGE_DIGEST_)"
 
 # 全局 warmup
-python3 /opt/_PH_INSTALL_/bench_v2.py --endpoint $EP --key dummy-bench --model $MODEL \
+python3 "$SCRIPT_DIR/bench_v2.py" --endpoint $EP --key dummy-bench --model $MODEL \
   --run-type pr --concurrency 1 --task-type coding --prefix-len 4096 --uuid-prefix \
   --rounds 1 --random-seed 999901 --out "$OUT/global_warmup" >> $OUT/run.log 2>&1
 

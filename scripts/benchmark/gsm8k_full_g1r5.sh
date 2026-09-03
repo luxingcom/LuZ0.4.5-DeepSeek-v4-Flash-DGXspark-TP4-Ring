@@ -1,8 +1,8 @@
 #!/bin/bash
 # sre10_s8c_gsm8k.sh — T5 GSM8K 全量 1319 题: --skip 114 双下标法 (seg A: skip0 nq114, seg B: skip114 nq1205)
 set -u
-KIT=/home/_PH_USER_/w6-kit
-LOGD=/home/_PH_USER_/w6-logs
+KIT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+LOGD=${BENCH_LOG_DIR:-$PWD/gsm8k-logs}
 OUT=$LOGD/W9R2_S8_GSM8K_G1R5
 mkdir -p $OUT
 echo "== S8c gsm8k full start $(date '+%F %T') =="

@@ -25,7 +25,7 @@
 | F2 | 混镜像风险脚本 w3_run_worker.sh（pin=r5 bf8cfa62）四机改名 .DEPRECATED-pinR5 | ✅ 完成 |
 | F3 | w6_env.txt 加 NCCL_DEBUG=WARN。**偏离备案**：该文件为 KEY=VALUE 逐行解析，写 export 前缀会炸 docker run；md5=7533e663 | ✅ 完成（含备案） |
 | F4 | w3_run.sh usage 守卫 + env 注释/空行过滤（grep -v），四机 bash -n 通过 | ✅ 完成 |
-| F5 | analyze_bench.py 补齐 .186:<INSTALL_DIR>/（本地副本 sha256 前缀 72360bcb，2345B） | ⚠️ **执行状态待验**（Rex F1-F4 验收报告未含 F5，后被 NCCL 线挤占） |
+| F5 | analyze_bench.py 补齐  (node01 管理网末段):<INSTALL_DIR>/（本地副本 sha256 前缀 72360bcb，2345B） | ⚠️ **执行状态待验**（Rex F1-F4 验收报告未含 F5，后被 NCCL 线挤占） |
 
 ---
 
@@ -89,7 +89,7 @@
 ## 四、关键认知修正（本窗裁决沉淀）
 
 1. **stock vLLM worker 的 NCCL env 白名单清洗：17/20 项被洗。** a5 proc/1 全量取证实锤（worker 连 NCCL_DEBUG=INFO 都被洗）。env 注入类方案全数死于此——不是 NCCL 配错，是配置根本没到达进程。
-2. **EngineCore 层不洗。** a7 对照实验发现；反推 .188 泄漏 EngineCore（pid 3155709, 5750MiB）身份语义为 EngineCore 侧残留，T2 已核身份清理，恢复后须复检（铁证⑦）。
+2. **EngineCore 层不洗。** a7 对照实验发现；反推  (node03 管理网末段) 泄漏 EngineCore（pid 3155709, 5750MiB）身份语义为 EngineCore 侧残留，T2 已核身份清理，恢复后须复检（铁证⑦）。
 3. **生产从未挂 infiniband 设备 → NCCL_NET=IB 在生产从未真实行使。** 诚实账：ringonly RDMA 数据面形态判定为"生产本就不存在"；本窗实证仅证明"注入通路可达"，不证明"恢复了生产行为"。
 4. **rdma HCA 名 ≠ netdev 名。** NCCL_NET 匹配对象是 netdev；a9 的 rocep1s0f0 死点即此——须填四真实 10.100 netdev（a10 验证通过）。
 5. **（新增）shm_broadcast 非 collective 阶段 timeout 不触发**：head 侧每 60s 重试可无限悬置，守门判读须以"NOT READY 持续时长"而非 timeout 报错为准。
@@ -103,7 +103,7 @@
 3. **attempt-8（a8）三铁证未取得**：FAIL 于 NET 初始化未达 ready；切库证据为间接（a8 双运行时告警 + a10 全判据过）；直接 maps 取证待验（需集群 serving 态）。
 4. **W5 本窗未跑数据作废。** 判读门槛（PR@4K ≥2744 / 2744~2400 条件继续 / <2400 裁决）原样带入下窗；口径差声明同前（32768+enforce-eager+无dspark vs 600000+dspark+cudagraph，仅 prefill 通路可比）。
 5. **dspark 本窗裁掉**，恢复默认态确认以铁证清单为准。
-6. **F5 执行状态待验**（analyze_bench.py 是否已落 .186）——下窗 W5 复跑前必须先核。
+6. **F5 执行状态待验**（analyze_bench.py 是否已落  (node01 管理网末段)）——下窗 W5 复跑前必须先核。
 
 ---
 
@@ -117,7 +117,7 @@
 - **查 vLLM 0.28 已知 issue**：shm_broadcast 32g/64g 差异、env 白名单清洗行为是否有官方变更记录；
 - **64g 对齐试验**：head 侧 shm_broadcast 按 64g 对齐做最小化隔离验证（单机/双节点，不耗整窗）；
 - **固化取证通道**：NCCL_DEBUG 经 conf/PID1 层注入，恢复细粒度日志能力；补做 a8 时代缺的 maps 直接取证（serving 态）；
-- **性能三档复跑**按原门槛执行，先 --dry-run + --precheck；复跑前核 F5（analyze_bench.py 在 .186 在位）；
+- **性能三档复跑**按原门槛执行，先 --dry-run + --precheck；复跑前核 F5（analyze_bench.py 在  (node01 管理网末段) 在位）；
 - **补证（可选）**：本窗 serving 态已具备，可补做 attempt-8 时代缺的 maps 直接取证（四机 `grep -c ringonly /proc/<pid>/maps`），闭环"待验（需集群 serving 态）"标注。
 
 ---
@@ -131,12 +131,12 @@
 | ③ | 数据面 `ss` 见 10.100/10.20 网段 | ✅/🔴 |
 | ④ | health=200@8013 | ✅/🔴 |
 | ⑤ | **铁证原文：rank0 = anemll/dspark-vllm-gx10:0.2.1-v026.0**（0.26 fork，非 sm121a 谱系） | ✅ |
-| ⑥ | **铁证原文：.187 vllm028-rb Up 24h 未动；.188/.189 embed-8022 Up** | ✅（诚实记档见下） |
+| ⑥ | **铁证原文： (node02 管理网末段) vllm028-rb Up 24h 未动； (node03 管理网末段)/ (node04 管理网末段) embed-8022 Up** | ✅（诚实记档见下） |
 | ⑦ | **恢复后 EngineCore 泄漏复检**：EngineCore 均有 docker cgroup 归属，零孤儿 | ✅ |
 | ⑧ | **取证落盘**：w9-recovery-\<ip\>.log 全量归档 | ✅（诚实记档见下） |
 
 **⑥⑧ 诚实记档（如实收录，不遮掩）:**
-- **⑥**: .188/.189 embed-8022 的 uptime=23min —— 约 13:28 被 watchdog/自愈策略重启，**非 rex2 操作**；容器最终 healthy（13:39 全员成形）。
+- **⑥**:  (node03 管理网末段)/ (node04 管理网末段) embed-8022 的 uptime=23min —— 约 13:28 被 watchdog/自愈策略重启，**非 rex2 操作**；容器最终 healthy（13:39 全员成形）。
 - **⑧**: 归档缺 attempt5 独立文件（已并入 attempt8 日志），如实入账。
 
 **前置段补记（恢复前清零动作）:**
@@ -158,7 +158,7 @@ W9 铁证清单 ①~⑧ 判读全 ✅（见上节），宣告生产恢复完成�
 **时刻账（真实时刻）:**
 - 12:14 守门上下文交接
 - 13:05 二分止损线 —— **r10b（仅删 conf NET=IB）实际触发**，因 env 未同步无效，随后 r10c/r10d 接续
-- 13:28 .188/.189 embed-8022 被 watchdog/自愈策略重启（非 rex2 操作，诚实记档）
+- 13:28  (node03 管理网末段)/ (node04 管理网末段) embed-8022 被 watchdog/自愈策略重启（非 rex2 操作，诚实记档）
 - 13:35 W9 生产恢复令下达（较 14:15 硬开始提前——清零前置就绪）
 - 13:39 容器全员 healthy 成形
 - **13:53 W9 铁证①~⑧全过，生产恢复完成**

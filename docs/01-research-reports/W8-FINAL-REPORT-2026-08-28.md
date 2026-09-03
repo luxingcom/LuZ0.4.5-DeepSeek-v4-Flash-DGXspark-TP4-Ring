@@ -23,7 +23,7 @@
 
 ---
 
-## 2. P0 取证账（四项定谳，铁证落盘 `.186:/home/<USER>/w6-kit/w8-evidence/`）
+## 2. P0 取证账（四项定谳，铁证落盘 ` (node01 管理网末段):/home/<USER>/w6-kit/w8-evidence/`）
 
 ### 2.1 拓扑定谳（用户指令④）——"虚拟口 B"不存在
 
@@ -156,10 +156,10 @@
 
 | 数据 | 位置 |
 |---|---|
-| P0 取证五件 | `.186:/home/<USER>/w6-kit/w8-evidence/p0_t1~t4_*` |
-| S4 臂 CSV 16 件 + w8_arm.sh | `.186:/home/<USER>/w6-kit/w8-evidence/w8_s4_*.csv` |
-| 铁证八件 | `.186:/home/<USER>/w6-kit/w8-evidence/p26_*` |
-| W5 三档 rows | `.186:/home/<USER>/w6-logs/W8W5_{de_c1,de_c4,pr4k_c1}/rows_v2.csv` |
+| P0 取证五件 | ` (node01 管理网末段):/home/<USER>/w6-kit/w8-evidence/p0_t1~t4_*` |
+| S4 臂 CSV 16 件 + w8_arm.sh | ` (node01 管理网末段):/home/<USER>/w6-kit/w8-evidence/w8_s4_*.csv` |
+| 铁证八件 | ` (node01 管理网末段):/home/<USER>/w6-kit/w8-evidence/p26_*` |
+| W5 三档 rows | ` (node01 管理网末段):/home/<USER>/w6-logs/W8W5_{de_c1,de_c4,pr4k_c1}/rows_v2.csv` |
 | 执行日志 | 四机 `/home/<USER>/w6-logs/w8-*.log` |
 | 方案书 v2.0 | `deliverables/engineering-assurance/w8-tuning-plan-2026-08-28.md` |
 

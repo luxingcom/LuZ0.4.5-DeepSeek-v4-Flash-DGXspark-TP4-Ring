@@ -31,7 +31,7 @@
 | 我栈已知问题 | 上游对应检索结果 | 三类归类 | 我栈处置（现状/建议） |
 |---|---|---|---|
 | **AR stall = 单核压栈**（生产历史定位；W7 §5.1 排查项 #3 亲和面） | B 仓 **#79 同族已修**（spin-wait）但 vLLM 0.28 未含；#87（EngineDeadError 集合通信超时）不同族已修 | 上游未修（0.28） | 表 1 #79 行动：spin-wait 补丁移植 + libncclpin（NCCL→CPU8-9）pin 复核 4/4 生效 |
-| **EngineCore 泄漏**（W6 .188 pid 3155709/5750MiB 实证；sudo kill 处置；铁证⑦零孤儿门） | 两仓 issues 清单内**无对应 issue**（仅 #87 EngineDeadError 名称相近、机制不同） | **仅我栈独有**（诚实注记：未做 vLLM 全量上游检索，以两仓清单为界） | 处置经验已内化 runbook §9-2；恢复验收铁证⑦把关 |
+| **EngineCore 泄漏**（W6  (node03 管理网末段) pid 3155709/5750MiB 实证；sudo kill 处置；铁证⑦零孤儿门） | 两仓 issues 清单内**无对应 issue**（仅 #87 EngineDeadError 名称相近、机制不同） | **仅我栈独有**（诚实注记：未做 vLLM 全量上游检索，以两仓清单为界） | 处置经验已内化 runbook §9-2；恢复验收铁证⑦把关 |
 | **shm_broadcast 卡死**（W6 a10 head 侧 NOT READY 无限悬置；8/26 生产 conc=16 卡死 HEALTHCHECK 未检出） | B 仓 **#143 OPEN P1**（MAX_NUM_SEQS=16 首 c=16 burst 稳定杀引擎）——与 8/26 conc=16 事故**同族**；#141 为 64 行死锁（另族）；"32g/64g 诊断差异"无对应 | 上游未修（#143 OPEN） | ① concurrency_proxy 入口限流（P1 廉价护栏，阈值勿照抄）；② healthcheck_hardened 闭合"卡死仍 healthy"盲区（P0 思路）；③ shm 悬置判读以"NOT READY 持续时长"为准（runbook §9-3 已入） |
 | **901s JIT timeout**（W6 a12/a13 → attempt-14 cache 挂载+1800s 闭环） | B 仓 **#65 已修**（1800s 缓解落地）；**#117 OPEN P0**（**mid-serve** Triton JIT 仍拖垮 600s watchdog——#65 缓解覆盖不了 mid-serve 场景） | 上游未修（mid-serve 面 #117 OPEN） | 我栈主缓解=三 JIT cache 持久卷（P0，与 rex5 持久化项合并）；NCCL Flight Recorder 四件 env 为超时取证利器（P1） |
 | **PerSizeTuner host 平面 3/4 口枚举失效**（W9 发现，细节待留证） | **无对应**——PerSizeTuner 为我栈自研 ringonly 补丁逻辑（strings 铁证 `PerSizeTuner`/`ncclPersizeTunerOverride`），上游 NCCL 与两仓均无此物 | **仅我栈独有**（自研补丁面，上游无从修复） | 修复责任在我栈：rex5 留证（枚举路径/host 平面日志）→ 补丁侧闭环；host 平面回退路径=conf 层静态四口名单兜底 |

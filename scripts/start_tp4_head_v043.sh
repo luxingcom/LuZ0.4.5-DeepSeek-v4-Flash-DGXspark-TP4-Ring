@@ -22,7 +22,7 @@
 #   tonyd2wild 归档 w6-kit/reference/GLM-5.3-Flash-NVFP4-1M-KV-4x-DGX-Spark/ (8 项 GB10 修复/dflash2 overlay/取证)
 #   W4A4 自研内核  /opt/_PH_INSTALL_/nvfp4/ (routeA kernel1/v17 kernel2/plugin-src/routeb_official_v2 + docs/)
 #   0.26 生产档案  /opt/_PH_INSTALL_/backup/luz031-checkpoint-20260823/ (LuZ0.3.1 参考基线 2950/108.84/3057)
-#   服务器02(.187) 家目录: 0.26 时代全套测试资料(tessa/gw4000/v026r)
+#   服务器02(<MGMT_OCTET>) 家目录: 0.26 时代全套测试资料(已归档)
 # 已修复雷点(勿回退):
 #   ① persistent_topk >24K 上下文必崩(GB10 48SM/99KB) → SM≥78 门控已烘焙入镜像(DEEP-DECODE 29K PASS)
 #   ② flashinfer<0.6.18 缺 topk=192 → 0.6.18 已烘焙(DSpark graphs 11/11 铁证判据)
@@ -31,6 +31,7 @@
 # 密码纪律: sudo=_PH_PASSWORD_ | 集群钟慢本地 8h | docker rm 重建才刷新挂载
 # 保留挂载(数据类): /models(ro) /var/log/vllm(rw) flashinfer-cache/tilelang-cache(rw)
 # 移除挂载(已烘焙): fi18-wheels / indexer补丁 / libncclpin.so / nccl-ringonly / nccl-w7.conf
+#   (libncclpin 兼容: 若宿主仍存在该库文件则条件挂载,否则用镜像内烘焙版——v0.4.5-baked 已内置)
 # ==============================================================
 set -uo pipefail
 export HOME=/home/_PH_USER_
@@ -49,7 +50,7 @@ docker run -d --name $NAME --gpus all --privileged --shm-size 64g \
   -e NODE_RANK=0 -e MASTER_ADDR=_PH_NODE_IP_ -e MASTER_PORT=26000 \
   -e VLLM_HOST_IP=_PH_NODE_IP_ \
   -v /opt/_PH_INSTALL_/models/deepseek-v4-flash-0731:/models:ro \
-  -v /opt/_PH_INSTALL_/lib/libncclpin.so:/opt/libncclpin.so:ro \
+  $( [ -f /opt/_PH_INSTALL_/lib/libncclpin.so ] && echo "-v /opt/_PH_INSTALL_/lib/libncclpin.so:/opt/libncclpin.so:ro" ) \
   -v /home/_PH_USER_/vllm-logs:/var/log/vllm \
   -v /home/_PH_USER_/flashinfer-cache:/root/.cache/flashinfer:rw \
   -v /home/_PH_USER_/tilelang-cache:/root/.cache/tilelang:rw \

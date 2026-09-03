@@ -52,7 +52,7 @@
 
 **结构化数据**：`data/final-metrics-matrix-045.json`（48 格全量）+ `data/final-metrics-ext-045.json`（PR400K C2 扩展档）
 
-**测试复现**：完整基准参数与脚本见 [`scripts/benchmark/`](scripts/benchmark/)（`run_bench_full_matrix.sh` 完整矩阵 48 格 / `run_pr400k_c2.sh` PR400K 扩展 / `gsm8k_full_g1r5.sh` GSM8K 全量 / `bench_v2.py` + `w9r2_gsm8k_spot.py` 基准工具，脱敏版）。
+**测试复现**：完整基准参数与脚本见 [`scripts/benchmark/`](scripts/benchmark/)（**占位符替换与最小复现命令见 [`scripts/benchmark/README.md`](scripts/benchmark/README.md)**；`run_bench_full_matrix.sh` 完整矩阵 48 格 / `run_pr400k_c2.sh` PR400K 扩展 / `gsm8k_full_g1r5.sh` GSM8K 全量 / `bench_v2.py` + `w9r2_gsm8k_spot.py` 基准工具，脱敏版）。
 
 ---
 
@@ -94,6 +94,10 @@ data/                       基准原始数据（json/csv）
 - **检查点准备（autotune 内置）**：`docs/07-deployment/checkpoint-luz045-autotune-baked-2026-09-02.md`（W9R14）
 - **镜像脱敏分发**：`docs/07-deployment/image-redaction-delivery-2026-09-02.md`
 - **脱敏映射**：`REDACTION-MAP.md`
+
+## 📄 License
+
+本项目以 [Apache License 2.0](LICENSE) 发布。补丁源自内部 fork vLLM 0.26.1，使用前请自行确认上游许可链；模型权重（DeepSeek V4 Flash）不在本仓库分发，其使用受对应模型许可约束。
 
 ## 说明
 

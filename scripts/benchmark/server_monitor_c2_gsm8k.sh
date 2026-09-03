@@ -1,6 +1,6 @@
 #!/bin/bash
-# server_monitor_c2_gsm8k.sh — 服务器端(186)运行: PR400K C2 温度监控 + 完成后自动衔接 GSM8K
-# 部署: scp 到 186 /home/_PH_USER_/w6-kit/bench3/ + nohup 运行 (本地沙箱无法 SSH, 故放服务器端)
+# server_monitor_c2_gsm8k.sh — 服务器端(<MGMT_OCTET>)运行: PR400K C2 温度监控 + 完成后自动衔接 GSM8K
+# 部署: scp 到 <MGMT_OCTET> /home/_PH_USER_/w6-kit/bench3/ + nohup 运行 (本地沙箱无法 SSH, 故放服务器端)
 set -u
 OUT=/home/_PH_USER_/bench3-results/full-matrix-045
 C2LOG=$OUT/pr400kc2_nohup.log
@@ -17,9 +17,9 @@ for i in $(seq 1 240); do
     grep -E 'CELL_RESULT_EXT|_exit' $C2LOG | tail -8
     break
   fi
-  # 温度: 186 本地 + 其他三机 ssh
+  # 温度: <MGMT_OCTET> 本地 + 其他三机 ssh
   local_t=$(nvidia-smi --query-gpu=temperature.gpu --format=csv,noheader,nounits 2>/dev/null)
-  temps="186:$local_t"
+  temps="<MGMT_OCTET>:$local_t"
   warn=0
   for h in $OTHERS; do
     t=$(ssh -o ConnectTimeout=6 -o BatchMode=yes _PH_USER_@$h \

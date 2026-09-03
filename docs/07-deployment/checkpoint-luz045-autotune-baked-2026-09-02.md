@@ -10,7 +10,7 @@
 
 - **任务**：将 autotune 补丁从"挂载 patches 覆盖"改为"内置到检查点镜像"，消除开源推送对主机私有 patches 文件的依赖。
 - **复查结论**：生产挂载版补丁（702f8f56）逻辑正确——`VLLM_FLASHINFER_AUTOTUNE_CACHE_DIR` 设置时跳过 hash 子目录、固定路径写 `autotune_configs.json`；未设置时完全回退原版（向后兼容）。镜像内置原版（d1b3a174）未带此修复。
-- **内置完成**：新检查点镜像 `LuZ0.4.5-DeepSeek-v4-Flash-DGXspark-TP4-Ring-baked`（digest sha256:153e31d2）已 push registry；内置后 md5=702f8f56、py_compile OK、行为验证固定路径命中、W9R10 标记在位。
+- **内置完成**：新检查点镜像 `LuZ0.4.5-DeepSeek-v4-Flash-DGXspark-TP4-Ring-baked`（digest sha256:_PH_BAKE_IMAGE_DIGEST_）已 push registry；内置后 md5=702f8f56、py_compile OK、行为验证固定路径命中、W9R10 标记在位。
 - **相关文件重写**：head/worker start 脚本移除 autotune patches 挂载行（内置后挂载会覆盖镜像内修复版）；w6_env 的 `VLLM_FLASHINFER_AUTOTUNE_CACHE_DIR`（补丁触发开关）与 `VLLM_MOE_DYNAMIC_TILE_CAP=0` 保留。
 - **生产切换**：生产 `-VL` 由修复团队处理中，未动生产主脚本；检查点配套脚本 `*.baked-20260902` 已四机就位，切换时用。
 
@@ -21,7 +21,7 @@
 | 项目 | 内容 |
 |------|------|
 | 整体评级 | 🟢 通过（检查点版本已就绪） |
-| 新检查点镜像 | `LuZ0.4.5-DeepSeek-v4-Flash-DGXspark-TP4-Ring-baked`（digest sha256:153e31d27b08…df18b72） |
+| 新检查点镜像 | `LuZ0.4.5-DeepSeek-v4-Flash-DGXspark-TP4-Ring-baked`（digest sha256:_PH_BAKE_IMAGE_DIGEST_） |
 | autotune 内置后 md5 | 702f8f561496948bb0ac3d075d12670e（=生产挂载版） |
 | 原版备份 | 容器内 `.bak-orig-20260902`（镜像层内保留） |
 | 阻塞项 | 0（生产切换待督导/修复团队确认） |

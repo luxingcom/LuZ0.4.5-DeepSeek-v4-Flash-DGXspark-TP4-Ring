@@ -22,3 +22,4 @@ redact.py
 # 原始运行数据（大数据文件，仅保留结论文档）
 verification-logs/
 *.csv
+!data/*.csv

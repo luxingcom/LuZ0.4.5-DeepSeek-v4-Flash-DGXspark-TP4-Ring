@@ -14,7 +14,7 @@ if docker ps --format '{{.Names}}' | grep -qE '^(vllm028-tp4-rank|vllm-tp4-rank)
   docker wait "$EXISTING" || true
   exit 1
 fi
-for host in node0X node0X node0X; do
+for host in node02 node03 node04; do  # 三台 worker 序号 (node0X 为 head 占位, 见 REDACTION-MAP)
   ssh -o BatchMode=yes -o ConnectTimeout=8 "$host" \
     "docker rm -f \$(docker ps -aq --filter name=vllm028-tp4-rank) \$(docker ps -aq --filter name=vllm-tp4-rank) 2>/dev/null" >/dev/null 2>&1 || true
 done

@@ -15,7 +15,7 @@ import sys
 import time
 import urllib.request
 
-BASE = "http://127.0.0.1:8003"  # 网关 (worker .58), 可通过 --base 覆盖
+BASE = "http://127.0.0.1:8003"  # 网关 (worker <MGMT_OCTET>), 可通过 --base 覆盖
 MODEL = "deepseek-v4-flash-0731"
 API_KEY = "<API_KEY>"
 DATA = "/home/_PH_USER_/data/gsm8k_test.jsonl"

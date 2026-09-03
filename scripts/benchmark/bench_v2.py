@@ -13,7 +13,7 @@ SRE 工程师 Rex 开发。独立于既有 bench_prefill_decode_async.py，避�
   1. 并发档位      : --concurrency 1,2,4,6（每波 conc 在飞 = 真并发）
   2. DE 文本吞吐    : 输入 512 / 输出 4096 固定；任务类型 coding / json / prose 三套 prompt 模板；
                      ignore_eos=true 强制满长 4096（R3）；每种类型独立测量 decode 吞吐
-  3. PR 吞吐        : 随机前缀 512/2048/8192/32768/131076，max_tokens=1 纯 prefill；
+  3. PR 吞吐        : 随机前缀 512/2048/8192/32768/131072，max_tokens=1 纯 prefill；
                      前缀纯随机（无任务模板，R8 首选），固定 seed 可比、同 run 请求内容不同防 prefix-cache
   4. 接受率         : 每档 ok/http_err/timeout/conn_err/model_err/other 分类（R4 聚合口径亦输出）
   5. dspark 接受率  : 每档窗口前/后采样 /metrics 的 spec_decode counters（R5）：
@@ -65,7 +65,7 @@ import requests
 # 常量与默认矩阵
 # ---------------------------------------------------------------------------
 DEFAULT_CONCURRENCY = [1, 2, 4, 6]
-DEFAULT_PREFIX_LENS = [512, 2048, 8192, 32768, 131076]
+DEFAULT_PREFIX_LENS = [512, 2048, 8192, 32768, 131072]
 DEFAULT_TASKS = ["coding", "json", "prose"]
 DEFAULT_ROUNDS = 3
 DE_INPUT_LEN = 512          # DE 输入固定
@@ -592,7 +592,7 @@ def main():
     ap.add_argument("--task-type", default="coding,json,prose")
     ap.add_argument("--input-len", type=int, default=DE_INPUT_LEN, help="DE 输入 token 目标（默认 512）")
     ap.add_argument("--output-len", type=int, default=DE_OUTPUT_LEN, help="DE 输出 max_tokens（默认 4096）")
-    ap.add_argument("--prefix-len", default="512,2048,8192,32768,131076", help="PR 前缀 token 目标")
+    ap.add_argument("--prefix-len", default="512,2048,8192,32768,131072", help="PR 前缀 token 目标")
     ap.add_argument("--rounds", type=int, default=DEFAULT_ROUNDS, help="每档波数（每波 conc 并发在飞）")
     ap.add_argument("--random-seed", type=int, default=20260816, help="随机前缀基础 seed（档位内偏移固定）")
     ap.add_argument("--uuid-prefix", action="store_true", help="每 run 混入时间熵重seed: 跨 run 内容不同, 杜绝 APC 跨 run 命中 (W9-R8 用户指令); 同 run 内仍确定性")
