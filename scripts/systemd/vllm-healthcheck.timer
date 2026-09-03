@@ -1,0 +1,11 @@
+# vllm-healthcheck.timer — 自愈探针定时器
+[Unit]
+Description=Run vLLM TP4 healthcheck-rebuild periodically
+
+[Timer]
+OnBootSec=60
+OnUnitActiveSec=120
+Unit=vllm-healthcheck.service
+
+[Install]
+WantedBy=timers.target

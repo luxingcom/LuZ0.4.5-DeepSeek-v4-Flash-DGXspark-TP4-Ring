@@ -1,0 +1,5 @@
+# 99-gid-preflight — 最小权限: 仅允许 _PH_USER_ 无密码执行 nmcli 复位 GID
+# 部署: head(node01); 自愈链(healthcheck-rebuild)触发 gid_preflight.sh --fix 时免交互
+# 校验: visudo -c
+_PH_USER_ ALL=(root) NOPASSWD: /usr/bin/nmcli device disconnect *
+_PH_USER_ ALL=(root) NOPASSWD: /usr/bin/nmcli device connect *

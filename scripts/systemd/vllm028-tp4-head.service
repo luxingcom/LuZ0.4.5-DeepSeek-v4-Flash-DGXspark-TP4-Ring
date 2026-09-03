@@ -1,0 +1,18 @@
+# vllm028-tp4-head.service — head 自愈循环 (LuZ0.4.5)
+# 部署: node01(head); 由 vllm-healthcheck.timer 周期性触发 healthcheck-rebuild
+# 注意: Restart=always + monitor 循环会在容器删除后自动重建; 停机必须 systemctl stop 本单元
+[Unit]
+Description=vLLM TP4 head monitor (LuZ0.4.5-baked)
+After=docker.service network-online.target
+Requires=docker.service
+
+[Service]
+Type=simple
+User=_PH_USER_
+ExecStart=/opt/_PH_INSTALL_/scripts/monitor_tp4_head_v043.sh
+Restart=always
+RestartSec=10
+TimeoutStopSec=300
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,17 @@
+# vllm028-tp4-worker.service — worker 自愈循环 (LuZ0.4.5)
+# 部署: node02/node03/node04 (每机 NODE_RANK 经 start_tp4_worker_v043.sh 依主机名判定)
+[Unit]
+Description=vLLM TP4 worker monitor (LuZ0.4.5-baked)
+After=docker.service network-online.target
+Requires=docker.service
+
+[Service]
+Type=simple
+User=_PH_USER_
+ExecStart=/opt/_PH_INSTALL_/scripts/monitor_tp4_worker_v043.sh
+Restart=always
+RestartSec=10
+TimeoutStopSec=300
+
+[Install]
+WantedBy=multi-user.target

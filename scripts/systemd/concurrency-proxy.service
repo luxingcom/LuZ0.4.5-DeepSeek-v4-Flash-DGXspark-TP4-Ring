@@ -1,0 +1,15 @@
+# concurrency-proxy.service — 8001→8002 并发代理
+[Unit]
+Description=Concurrency proxy 8001->8002 (MAX_CONCURRENCY=6)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=_PH_USER_
+ExecStart=/opt/_PH_INSTALL_/scripts/concurrency-proxy  # 由 head 启动脚本置入的代理二进制/脚本
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

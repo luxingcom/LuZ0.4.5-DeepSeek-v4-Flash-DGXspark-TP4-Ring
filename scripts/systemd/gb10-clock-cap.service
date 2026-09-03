@@ -1,0 +1,13 @@
+# gb10-clock-cap.service — GPU 频率上限 (LuZ0.4.5)
+# 部署: 四机; 控制 nvidia-smi -lgc。当前 2200MHz 制(09-02 热修复降频)。
+[Unit]
+Description=Cap GB10 GPU clock to prevent thermal shutdown
+After=multi-user.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/bash -c 'nvidia-smi -lgc 0,2200'
+
+[Install]
+WantedBy=multi-user.target
