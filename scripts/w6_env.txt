@@ -8,7 +8,7 @@
 #       当前布线判定不可用，见 w9-evidence/w9r4/W9-R8-RINGONLY-V5-LATENCY.md，故本文件保持无此行）
 # 覆盖实例: NCCL_DEBUG=INFO / NCCL_DEBUG_FILE 即 ① 层覆盖 ② 层(conf 同项 WARN)的活例
 # =============================================================================
-# W7 attempt-11: NET=IB 全族复原（对齐生产 22 项 env；SOCKET_IFNAME 保持四真实 10.100 netdev 供 GLOO/bootstrap）
+# W7 attempt-11: NET=IB 全族复原（对齐生产 22 项 env；SOCKET_IFNAME 保持四真实 <RING_SUBNET> netdev 供 GLOO/bootstrap）
 NCCL_ALGO=RING
 NCCL_NET=IB
 NCCL_IB_HCA=rocep1s0f0,rocep1s0f1,roceP2p1s0f0,roceP2p1s0f1
@@ -37,7 +37,7 @@ DG_JIT_USE_NVRTC=0
 CUDA_DEVICE_ORDER=PCI_BUS_ID
 GLOO_SOCKET_IFNAME=enP7s7
 VLLM_DISABLE_CUSTOM_ALL_REDUCE=1
-VLLM_DP_MASTER_IP=<NODE_IP>
+VLLM_DP_MASTER_IP=_PH_NODE_IP_
 VLLM_TOPO_SAME_NODE_MAP=0,1,2,3
 TORCH_CUDA_ARCH_LIST=12.1a
 VLLM_USE_FLASHINFER_SAMPLER=1

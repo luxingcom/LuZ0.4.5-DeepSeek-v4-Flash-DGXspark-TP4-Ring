@@ -107,7 +107,46 @@
 - 口径：`gsm8k_full_g1r5.sh`（温度 0.6 / 8-shot / max_tokens 1024 / concurrency 1），merged summary 由 segA+segB 合成
 - **状态**：✅ 完成（2026-09-02 17:05 UTC，merged ts）
 
-## 6. 数据与证据
+## 6. PR/DE 聚合口径（总吞吐）
+
+> 两列聚合口径：**PR = prefill 吞吐（tps）**，**DE = decode 吞吐（t/s）**。矩阵中每格同时产出 prefill 与 decode 两路指标，本节按任务/前缀/并发三个维度聚合，给出系统总吞吐能力。
+
+### 6.1 DE 段聚合（文本生成混合负载，input 512 / output 4096）
+
+| 聚合维度 | PR（prefill tps） | DE（decode t/s） | 说明 |
+|---|---|---|---|
+| coding C1 | 1857 | 102.1 | 代码生成单流 |
+| json C1 | 1862 | 106.5 | 结构化输出单流（decode 峰值）|
+| prose C1 | 1842 | 48.8 | 长文生成单流 |
+| **三任务 C1 均值** | **~1854** | **~85.8** | DE 混合负载聚合 |
+| 三任务 C12（满载） | 333-346 | 16.8-34.7 | 12 并发满载（json 34.7 / coding 32.5 / prose 16.8）|
+
+### 6.2 PR 段聚合（纯 prefill，output-len 1）
+
+| 前缀档 | PR C1（tps） | PR C12（tps） | PR C1→C12 降幅 |
+|---|---|---|---|
+| PR512 | 1812 | 295 | -84% |
+| PR2048 | **2748**（峰值）| 398 | -86% |
+| PR8192 | 2721 | 418 | -85% |
+| PR32768 | 2650 | 417 | -84% |
+| PR131072 | 2362 | 361 | -85% |
+| **5 档 C1 均值** | **~2459** | — | 纯 prefill 聚合 |
+
+### 6.3 总吞吐结论
+
+| 口径 | 数值 |
+|---|---|
+| **prefill 峰值吞吐** | **2748 tps**（PR2048 C1，2400 制）|
+| **decode 峰值吞吐** | **106.5 t/s**（json DE C1，2400 制）|
+| **混合负载聚合**（DE 段 C1）| prefill ~1854 tps + decode ~85.8 t/s |
+| **纯 prefill 聚合**（PR 段 C1 均值）| ~2459 tps |
+| **长上下文单流**（PR131K C1）| prefill 2362 tps / TTFT 48.8s |
+| **满载吞吐**（C12）| prefill 361 tps（131K）/ decode 32.5 t/s（coding）|
+| **扩展档**（PR400K C2，2200 制）| prefill 921.5 tps / TTFT 381.9s |
+
+> 总吞吐口径说明：prefill 与 decode 共享同一 GPU 算力/带宽（B12X MoE），峰值不可同时叠加；混合负载下系统吞吐 = prefill 聚合（~1854 tps）+ decode 聚合（~85.8 t/s），即单节点 TP4 环网在文本生成场景的端到端吞吐能力。
+
+## 7. 数据与证据
 
 - `data/final-metrics-matrix-045.json` — 48 格全量（rounds + 中位）
 - `data/final-metrics-matrix-045.csv` — 48 格主表
@@ -116,4 +155,4 @@
 
 ---
 
-*v2 最终版生成 2026-09-03 01:10（矩阵 48 格 + PR400K C2 + GSM8K 全量全落盘；矩阵为 2400 制，PR400K C2/GSM8K 为 2200 制）*
+*v2 最终版生成 2026-09-03 01:10（矩阵 48 格 + PR400K C2 + GSM8K 全量全落盘；矩阵为 2400 制，PR400K C2/GSM8K 为 2200 制；2026-09-03 09:2x 补充 §6 PR/DE 聚合口径）*

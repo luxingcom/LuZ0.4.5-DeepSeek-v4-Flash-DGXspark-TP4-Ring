@@ -17,11 +17,11 @@
 #   s0_capability_matrix.md       镜像能力矩阵(flag/backend 枚举实证)
 #   s3_mtp_results.md / s4s5_arms_and_final.md / t8_apc_investigation.md / s8_three_way.csv
 # 关键资产:
-#   ringonly 源码  _PH_INSTALL_DIR_/backup/nccl-official-2307-hardened-20260816 (git 0dd44cd, 血统 md5 2be94172 一致)
+#   ringonly 源码  /opt/_PH_INSTALL_/backup/nccl-official-2307-hardened-20260816 (git 0dd44cd, 血统 md5 2be94172 一致)
 #   v5 库          w6-kit/ringonly-v5/ (NCCL_RING_MAP=quad 门控, 默认 v4 字节兼容)
 #   tonyd2wild 归档 w6-kit/reference/GLM-5.3-Flash-NVFP4-1M-KV-4x-DGX-Spark/ (8 项 GB10 修复/dflash2 overlay/取证)
-#   W4A4 自研内核  _PH_INSTALL_DIR_/nvfp4/ (routeA kernel1/v17 kernel2/plugin-src/routeb_official_v2 + docs/)
-#   0.26 生产档案  _PH_INSTALL_DIR_/backup/luz031-checkpoint-20260823/ (LuZ0.3.1 参考基线 2950/108.84/3057)
+#   W4A4 自研内核  /opt/_PH_INSTALL_/nvfp4/ (routeA kernel1/v17 kernel2/plugin-src/routeb_official_v2 + docs/)
+#   0.26 生产档案  /opt/_PH_INSTALL_/backup/luz031-checkpoint-20260823/ (LuZ0.3.1 参考基线 2950/108.84/3057)
 #   服务器02(.187) 家目录: 0.26 时代全套测试资料(tessa/gw4000/v026r)
 # 已修复雷点(勿回退):
 #   ① persistent_topk >24K 上下文必崩(GB10 48SM/99KB) → SM≥78 门控已烘焙入镜像(DEEP-DECODE 29K PASS)
@@ -48,7 +48,8 @@ docker run -d --name $NAME --gpus all --privileged --shm-size 64g \
   $ENVS \
   -e NODE_RANK=0 -e MASTER_ADDR=_PH_NODE_IP_ -e MASTER_PORT=26000 \
   -e VLLM_HOST_IP=_PH_NODE_IP_ \
-  -v _PH_INSTALL_DIR_/models/deepseek-v4-flash-0731:/models:ro \
+  -v /opt/_PH_INSTALL_/models/deepseek-v4-flash-0731:/models:ro \
+  -v /opt/_PH_INSTALL_/lib/libncclpin.so:/opt/libncclpin.so:ro \
   -v /home/_PH_USER_/vllm-logs:/var/log/vllm \
   -v /home/_PH_USER_/flashinfer-cache:/root/.cache/flashinfer:rw \
   -v /home/_PH_USER_/tilelang-cache:/root/.cache/tilelang:rw \

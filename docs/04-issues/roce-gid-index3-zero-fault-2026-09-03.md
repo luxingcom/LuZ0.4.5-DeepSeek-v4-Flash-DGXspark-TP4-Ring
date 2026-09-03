@@ -67,7 +67,7 @@
 
 ### 3.1 新增预检脚本 `gid_preflight.sh`
 
-部署于四机 `/opt/aicad-prod/scripts/gid_preflight.sh`，功能：
+部署于四机 `/opt/_PH_INSTALL_/scripts/gid_preflight.sh`，功能：
 
 | 模式 | 行为 |
 |------|------|
@@ -103,9 +103,9 @@
 
 ```bash
 # 一键四机巡检（任一节点执行）
-bash /opt/aicad-prod/scripts/gid_preflight.sh --all
+bash /opt/_PH_INSTALL_/scripts/gid_preflight.sh --all
 # 发现空 GID 时自动复位
-bash /opt/aicad-prod/scripts/gid_preflight.sh --all --fix
+bash /opt/_PH_INSTALL_/scripts/gid_preflight.sh --all --fix
 ```
 
 ### 可复发坑与预防
@@ -122,8 +122,8 @@ bash /opt/aicad-prod/scripts/gid_preflight.sh --all --fix
 
 | 文件 | 位置 | 说明 |
 |------|------|------|
-| `gid_preflight.sh` | 四机 `/opt/aicad-prod/scripts/` | 新增预检脚本（含根因注释 + 诊断口诀） |
-| `healthcheck-rebuild.sh` | 四机 `/opt/aicad-prod/scripts/` | 已集成预检（docker rm 前） |
+| `gid_preflight.sh` | 四机 `/opt/_PH_INSTALL_/scripts/` | 新增预检脚本（含根因注释 + 诊断口诀） |
+| `healthcheck-rebuild.sh` | 四机 `/opt/_PH_INSTALL_/scripts/` | 已集成预检（docker rm 前） |
 | `monitor_tp4_head_v043.sh` | 01 `/home/liuxiaoya/w6-kit/` | 已集成预检（start 前） |
 | `monitor_tp4_worker_v043.sh` | 四机 `/home/liuxiaoya/w6-kit/` | 已集成预检（start 前） |
 | `/etc/sudoers.d/99-gid-preflight` | 四机 | NOPASSWD nmcli（最小权限） |

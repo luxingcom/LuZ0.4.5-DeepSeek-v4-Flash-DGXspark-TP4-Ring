@@ -33,7 +33,7 @@
   },
   "gid_preflight": {
     "issue": "peer power-cut -> NM drops static IP -> RoCE GID idx3 zero -> NCCL link fail (ibv_modify_qp errno 61, local GID ::)",
-    "script": "/opt/aicad-prod/scripts/gid_preflight.sh",
+    "script": "/opt/_PH_INSTALL_/scripts/gid_preflight.sh",
     "integrated": ["healthcheck-rebuild.sh", "monitor_tp4_head_v043.sh", "monitor_tp4_worker_v043.sh"],
     "doc": "docs/04-issues/roce-gid-index3-zero-fault-2026-09-03.md",
     "status": "all 4 nodes 8 ports GID OK"
@@ -42,7 +42,7 @@
     "status": "applied & verified",
     "host_lib_md5": "69f20139c993f019742966f8a31976e9",
     "v8_backup": ".bak-v8-20260903",
-    "mount": "-v /opt/aicad-prod/lib/libncclpin.so:/opt/libncclpin.so:ro",
+    "mount": "-v /opt/_PH_INSTALL_/lib/libncclpin.so:/opt/libncclpin.so:ro",
     "verify": "pt_nccl_watchdg/pt_nccl_heartbt/pt_tcpstore_uv -> CPU 8-9 (isolated) on all 4 nodes",
     "note": "V8 defect (NCCL threads on 5-19, isolated cores idle) fixed; iou-sqp remains 5-19 (design boundary)"
   }

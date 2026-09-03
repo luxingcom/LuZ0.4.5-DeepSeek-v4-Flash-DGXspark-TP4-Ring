@@ -3,7 +3,7 @@
 # SCRIPT: start_tp4_worker_v043.sh
 # VERSION: v044-r1 (W9-R8 定版, 2026-08-29)  [文件名沿用以保 systemd/monitor 兼容]
 # USAGE: NODE_RANK=N VLLM_HOST_IP=<ip> bash start_tp4_worker_v043.sh (或由 monitor_v043 调用)
-# HOST: node0X/03/04 (_PH_NODE_IP_/_PH_MGMT_OCTET_/_PH_MGMT_OCTET_)
+# HOST: node02/03/04 (_PH_NODE_IP_/188/189)
 # ─── 研究资料索引 ───（完整版见 start_tp4_head_v043.sh 头注）
 #   全参数 dossier: w9-evidence/w9r4/W9-R8-PARAMETER-DOSSIER.md
 #   镜像烘焙清单:   w6-kit/Dockerfile.LuZ-0.4.4（FI0.6.18+indexer门控+ringonly-v5+shim+conf）
@@ -29,7 +29,8 @@ docker run -d --name $NAME --gpus all --privileged --shm-size 64g \
   $ENVS \
   -e NODE_RANK=$NODE_RANK -e MASTER_ADDR=_PH_NODE_IP_ -e MASTER_PORT=26000 \
   -e VLLM_HOST_IP=$VLLM_HOST_IP \
-  -v _PH_INSTALL_DIR_/models/deepseek-v4-flash-0731:/models:ro \
+  -v /opt/_PH_INSTALL_/models/deepseek-v4-flash-0731:/models:ro \
+  -v /opt/_PH_INSTALL_/lib/libncclpin.so:/opt/libncclpin.so:ro \
   -v /home/_PH_USER_/vllm-logs:/var/log/vllm \
   -v /home/_PH_USER_/flashinfer-cache:/root/.cache/flashinfer:rw \
   -v /home/_PH_USER_/tilelang-cache:/root/.cache/tilelang:rw \

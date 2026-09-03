@@ -24,9 +24,25 @@
 | PR400K C2（更大压力） | prefill **921.5 tps** / TTFT **381.9s** | 2200MHz 制，3 波中位 |
 | GSM8K 全量（1319 题） | **content 0.9363 / marker 0.9371** | 双项 ≥0.930 门 **PASS** |
 
+### PR/DE 聚合口径（总吞吐）
+
+> **PR = prefill 吞吐（tps）**，**DE = decode 吞吐（t/s）**，两列聚合见下方；完整聚合推导见 [FINAL-METRICS §6](docs/03-final-metrics/FINAL-METRICS-2026-09-02.md)。
+
+| 聚合口径 | PR（prefill tps） | DE（decode t/s） |
+|---|---|---|
+| **单流峰值（C1）** | **2748**（PR2048） | **106.5**（json） |
+| **混合负载聚合**（DE 段 C1 三任务均值） | ~1854 | ~85.8 |
+| **纯 prefill 聚合**（PR 段 C1 均值） | ~2459 | — |
+| **长上下文单流**（PR131K C1） | 2362 | — |
+| **满载吞吐**（C12） | 361（131K） | 32.5（coding） |
+
+**总吞吐**：prefill 峰值 **2748 tps** + decode 峰值 **106.5 t/s**（共享 GPU 算力，峰值不可叠加；混合负载端到端 = prefill ~1854 tps + decode ~85.8 t/s）。
+
 *口径注：完整矩阵（DE/PR）为 2400MHz 制；PR400K C2 与 GSM8K 为 2200MHz 制（2026-09-02 深夜散热降频修复后，详见 FINAL-METRICS §0）。*
 
 **结构化数据**：`data/final-metrics-matrix-045.json`（48 格全量）+ `data/final-metrics-ext-045.json`（PR400K C2 扩展档）
+
+**测试复现**：完整基准参数与脚本见 [`scripts/benchmark/`](scripts/benchmark/)（`run_bench_full_matrix.sh` 完整矩阵 48 格 / `run_pr400k_c2.sh` PR400K 扩展 / `gsm8k_full_g1r5.sh` GSM8K 全量 / `bench_v2.py` + `w9r2_gsm8k_spot.py` 基准工具，脱敏版）。
 
 ---
 
