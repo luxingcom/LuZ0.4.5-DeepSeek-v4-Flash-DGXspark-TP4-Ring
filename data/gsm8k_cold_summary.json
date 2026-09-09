@@ -1,0 +1,14 @@
+{
+ "nq": 1319,
+ "accuracy_content": 0.9583017437452616,
+ "accuracy_marker": 0.9575435936315391,
+ "correct_content": 1264,
+ "correct_marker": 1263,
+ "err": 0,
+ "elapsed_s": 11707.181911706924,
+ "ts": "2026-09-09 01:16:25",
+ "base": "http://127.0.0.1:8001",
+ "model": "deepseek-v4-flash-vision-exp",
+ "temperature": 0.6,
+ "max_tokens": 4096
+}

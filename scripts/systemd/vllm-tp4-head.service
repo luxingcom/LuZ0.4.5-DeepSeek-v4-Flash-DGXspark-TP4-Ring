@@ -1,0 +1,21 @@
+[Unit]
+# v043-r1 (W9R2 rex8) 源: vllm-tp4-head.service — 新版 vLLM0.28 LuZ-0.4.3-RingMOD TP4 head
+Description=vLLM TP4 head (rank0) with self-heal [v043]
+After=remote-fs.target network-online.target docker.service
+Wants=network-online.target remote-fs.target docker.service
+StartLimitIntervalSec=1800
+StartLimitBurst=20
+
+[Service]
+User=_PH_USER_
+Type=simple
+Environment=HOME=/home/_PH_USER_
+ExecStart=/home/_PH_USER_/w6-kit/monitor_tp4_head_v043.sh
+Restart=always
+RestartSec=15
+TimeoutStartSec=1500
+TimeoutStopSec=300
+ExecStopPost=/opt/_PH_INSTALL_/scripts/crash_dump.sh vllm-tp4-rank0
+
+[Install]
+WantedBy=multi-user.target

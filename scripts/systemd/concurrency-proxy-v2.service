@@ -1,0 +1,50 @@
+# concurrency-proxy-v2.service — 8001→8002 流式感知网关（替换 v1 unit）
+# 部署位置（node01）：/etc/systemd/system/concurrency-proxy-v2.service
+# ⚠️ 本文件必须 LF 行尾（Windows 编辑后用 unix2dos -c uni2dos 反向/或 dos2unix 修正）
+# 回退：systemctl disable --now concurrency-proxy-v2 && systemctl start concurrency-proxy
+[Unit]
+Description=TP4 vLLM streaming-aware gateway v2 (0.0.0.0:8001 -> 127.0.0.1:8002, SSE heartbeat + TTFT budget + admission backpressure + dedup)
+Documentation=file:///opt/_PH_INSTALL_/scripts/concurrency_proxy_v2.py
+After=network-online.target docker.service
+Wants=network-online.target
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+[Service]
+User=_PH_USER_
+Type=simple
+Environment=HOME=/home/_PH_USER_
+Environment=UPSTREAM=http://127.0.0.1:8002
+Environment=PORT=8001
+# —— 并发与 admission ——
+Environment=MAX_CONCURRENCY=6
+Environment=QUEUE_TIMEOUT=20
+# —— 长上下文预算（对位引擎 400K prefill 300s 活性判据，2 倍余量）——
+Environment=FIRST_TOKEN_TIMEOUT=600
+Environment=CHUNK_IDLE_TIMEOUT=180
+# —— SSE 心跳（QwenPaw 30s idle 计时器穿透）——
+Environment=HEARTBEAT_INTERVAL=5
+# —— 慢客户端与长流兜底 ——
+Environment=WRITE_TIMEOUT=60
+Environment=TOTAL_STREAM_TIMEOUT=7200
+# —— 等值重试抑制（误伤合法同文并发时置 0）——
+Environment=DEDUP_ENABLE=1
+Environment=NONSTREAM_TOTAL_TIMEOUT=900
+Environment=RETRY_CONNECT=1
+Environment=LOG_LEVEL=INFO
+# /gw/* 管理端点鉴权（留空=内网开放；建议设置）
+Environment=GW_API_KEY=<BEARER>
+ExecStart=/usr/bin/python3 /opt/_PH_INSTALL_/scripts/concurrency_proxy_v2.py
+Restart=always
+RestartSec=5
+# —— SRE 护栏 ——
+TimeoutStopSec=60
+MemoryMax=2G
+LimitNOFILE=65536
+# 注意：vllm 自愈链只探 8002 不探 8001 —— 本单元 StartLimit 抑制停转后无自动发现，
+# 部署切换窗口与首日须人工 watch systemctl status concurrency-proxy-v2（或临时加 8001 探针）
+WatchdogSec=0
+
+[Install]
+WantedBy=multi-user.target
+

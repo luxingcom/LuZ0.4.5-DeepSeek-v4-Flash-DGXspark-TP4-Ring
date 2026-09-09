@@ -1,0 +1,47 @@
+{
+  "image": "LuZ0.4.5-DeepSeek-v4-Flash-DGXspark-TP4-Ring-baked (VL)",
+  "digest": "_PH_BAKE_IMAGE_DIGEST_",
+  "generated": "2026-09-09 CST",
+  "clock_note": "ext run within cold suite 2026-09-08/09 (PR400K + GSM8K full 1319)",
+  "pr400k_c2": {
+    "rounds": {
+      "r1": {
+        "prefill_tps": 951.1,
+        "ttft_s": 370.1957,
+        "ok": 2
+      },
+      "r2": {
+        "prefill_tps": 955.88,
+        "ttft_s": 368.1839,
+        "ok": 2
+      },
+      "r3": {
+        "prefill_tps": 957.76,
+        "ttft_s": 367.3954,
+        "ok": 2
+      }
+    },
+    "median": {
+      "prefill_tps": 955.88,
+      "ttft_s": 368.1839,
+      "ok": "2/2/2"
+    },
+    "mode": "conc=2, prefix-len 400000, output-len 1, uuid-prefix cold, 3-round median"
+  },
+  "gsm8k_full": {
+    "nq_total": 1319,
+    "accuracy_content": 0.9583,
+    "accuracy_marker": 0.9575,
+    "correct_content": 1264,
+    "correct_marker": 1263,
+    "err": 0,
+    "elapsed_s": 11707.2,
+    "config": {
+      "temperature": 0.6,
+      "max_tokens": 4096,
+      "endpoint": "http://127.0.0.1:8001",
+      "model": "deepseek-v4-flash-vision-exp"
+    },
+    "ts": "2026-09-09 01:16:25"
+  }
+}

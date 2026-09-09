@@ -1,15 +1,15 @@
 #!/bin/bash
 # sre10_s8c_gsm8k.sh — T5 GSM8K 全量 1319 题: --skip 114 双下标法 (seg A: skip0 nq114, seg B: skip114 nq1205)
 set -u
-KIT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-LOGD=${BENCH_LOG_DIR:-$PWD/gsm8k-logs}
+KIT=/home/_PH_USER_/w6-kit
+LOGD=/home/_PH_USER_/w6-logs
 OUT=$LOGD/W9R2_S8_GSM8K_G1R5
 mkdir -p $OUT
 echo "== S8c gsm8k full start $(date '+%F %T') =="
 
 echo "== seg A: skip=0 nq=114 =="
 python3 $KIT/w9r2_gsm8k_spot.py \
-  --base http://_PH_NODE_IP_:8002 \
+  --base http://_PH_HEAD_IP_.186:8002 \
   --nq 114 --skip 0 \
   --out-raw $OUT/gsm8k_segA_raw.jsonl \
   --out-summary $OUT/gsm8k_segA_summary.json \
@@ -19,7 +19,7 @@ cat $OUT/gsm8k_segA_summary.json 2>/dev/null; echo
 
 echo "== seg B: skip=114 nq=1205 =="
 python3 $KIT/w9r2_gsm8k_spot.py \
-  --base http://_PH_NODE_IP_:8002 \
+  --base http://_PH_HEAD_IP_.186:8002 \
   --nq 1205 --skip 114 \
   --out-raw $OUT/gsm8k_segB_raw.jsonl \
   --out-summary $OUT/gsm8k_segB_summary.json \

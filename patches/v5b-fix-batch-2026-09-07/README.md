@@ -1,6 +1,6 @@
 # V5b 修复批次（2026-09-07）
 
-生产镜像 `LuZ0.4.5-DeepSeek-v4-Flash-DGXspark-TP4-Ring-V5b`（registry digest `sha256:bb22a8c7…`）对应的修复批次发布：三个 bug 修复（A1/A2/A3）+ 两个环境门控特性（B1/B2）+ 窗口重启守卫脚本 + 工程审查文档。
+生产镜像 `LuZ0.4.5-DeepSeek-v4-Flash-DGXspark-TP4-Ring-V5b`（registry digest `sha256:<BAKE_IMAGE_DIGEST>`）对应的修复批次发布：三个 bug 修复（A1/A2/A3）+ 两个环境门控特性（B1/B2）+ 窗口重启守卫脚本 + 工程审查文档。
 
 ## 内容索引
 

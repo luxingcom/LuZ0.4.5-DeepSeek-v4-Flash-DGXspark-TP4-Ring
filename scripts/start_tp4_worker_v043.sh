@@ -3,7 +3,7 @@
 # SCRIPT: start_tp4_worker_v043.sh
 # VERSION: v044-r1 (W9-R8 定版, 2026-08-29)  [文件名沿用以保 systemd/monitor 兼容]
 # USAGE: NODE_RANK=N VLLM_HOST_IP=<ip> bash start_tp4_worker_v043.sh (或由 monitor_v043 调用)
-# HOST: node02/03/04 (_PH_NODE_IP_/188/189)
+# HOST: node02/03/04 (_PH_HEAD_IP_.187/188/189)
 # ─── 研究资料索引 ───（完整版见 start_tp4_head_v043.sh 头注）
 #   全参数 dossier: w9-evidence/w9r4/W9-R8-PARAMETER-DOSSIER.md
 #   镜像烘焙清单:   w6-kit/Dockerfile.LuZ-0.4.4（FI0.6.18+indexer门控+ringonly-v5+shim+conf）
@@ -15,9 +15,9 @@ set -uo pipefail
 export HOME=/home/_PH_USER_
 NODE_RANK="${NODE_RANK:?need NODE_RANK}"
 VLLM_HOST_IP="${VLLM_HOST_IP:?need VLLM_HOST_IP}"
-NAME="vllm028-tp4-rank${NODE_RANK}"
+NAME="vllm-tp4-rank${NODE_RANK}"
 KIT=/home/_PH_USER_/w6-kit
-R5="REGISTRY_HOST:5000/vllm/vllm-openai:LuZ0.4.5-DeepSeek-v4-Flash-DGXspark-TP4-Ring-baked"
+R5="REGISTRY_HOST:5000/vllm/vllm-openai:LuZ0.4.5-DeepSeek-v4-Flash-DGXspark-TP4-Ring-V5b"
 ENVS=""
 while IFS='=' read -r k v; do ENVS="$ENVS -e $k=$v"; done < <(grep -v '^\s*#' $KIT/w6_env.txt | grep -v '^\s*$')
 mkdir -p /home/_PH_USER_/vllm-logs /tmp/vllm-crash
@@ -30,7 +30,7 @@ docker run -d --name $NAME --gpus all --privileged --shm-size 64g \
   -e NODE_RANK=$NODE_RANK -e MASTER_ADDR=_PH_NODE_IP_ -e MASTER_PORT=26000 \
   -e VLLM_HOST_IP=$VLLM_HOST_IP \
   -v /opt/_PH_INSTALL_/models/deepseek-v4-flash-0731:/models:ro \
-  $( [ -f /opt/_PH_INSTALL_/lib/libncclpin.so ] && echo "-v /opt/_PH_INSTALL_/lib/libncclpin.so:/opt/libncclpin.so:ro" ) \
+  -v /opt/_PH_INSTALL_/lib/libncclpin.so:/opt/libncclpin.so:ro \
   -v /home/_PH_USER_/vllm-logs:/var/log/vllm \
   -v /home/_PH_USER_/flashinfer-cache:/root/.cache/flashinfer:rw \
   -v /home/_PH_USER_/tilelang-cache:/root/.cache/tilelang:rw \
@@ -58,5 +58,5 @@ docker run -d --name $NAME --gpus all --privileged --shm-size 64g \
   --load-format safetensors \
   --port 8002 \
   --tensor-parallel-size 4 --nnodes 4 --node-rank $NODE_RANK \
-  --master-addr _PH_NODE_IP_ --master-port 26000"
+  --master-addr _PH_HEAD_IP_.186 --master-port 26000"
 echo "[v044] worker 容器已启动: $NODE_RANK $NAME (镜像烘焙态)"

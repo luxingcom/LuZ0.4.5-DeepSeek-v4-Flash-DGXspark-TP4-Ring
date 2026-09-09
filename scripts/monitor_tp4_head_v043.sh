@@ -2,22 +2,27 @@
 # monitor_tp4_head_v043.sh — v043-r1 (W9R2 rex8) 源: monitor_tp4_head.sh v1.5-r11
 # 语义保留: docker wait 跟随 + head 重建前 ssh 清 worker 容器 + D3 rank 就绪门禁(60s 无进展 fail)
 # rex-g 20260831: 增加 guard 互斥(本机任一 vLLM TP4 容器-新旧两代-存在即跟随等待, 防双自愈链并发拉起抢端口);
-#                 head 重建前清理扩展为两代容器名(旧 vllm-tp4-rank* + 新 vllm028-tp4-rank*)
+#                 head 重建前清理扩展为两代容器名(旧 vllm-tp4-rank* + 新 vllm-tp4-rank*)
 set -uo pipefail
 export HOME=/home/_PH_USER_
-NAME=vllm028-tp4-rank0
+NAME=vllm-tp4-rank0
 MASTER_PORT=26000
 # guard 互斥: 本机存在任一 vLLM TP4 容器(新旧两代) => 跟随其退出, 绝不并发拉起第二套栈
-if docker ps --format '{{.Names}}' | grep -qE '^(vllm028-tp4-rank|vllm-tp4-rank)[0-9]*$'; then
-  EXISTING=$(docker ps --format '{{.Names}}' | grep -E '^(vllm028-tp4-rank|vllm-tp4-rank)[0-9]*$' | head -1)
+if docker ps --format '{{.Names}}' | grep -qE '^(vllm-tp4-rank|vllm-tp4-rank)[0-9]*$'; then
+  EXISTING=$(docker ps --format '{{.Names}}' | grep -E '^(vllm-tp4-rank|vllm-tp4-rank)[0-9]*$' | head -1)
   echo "[guard] 本机已有容器 ${EXISTING}, 跟随等待其退出, 不并发拉起" >&2
   docker wait "$EXISTING" || true
   exit 1
 fi
-for host in node02 node03 node04; do  # 三台 worker 序号 (node0X 为 head 占位, 见 REDACTION-MAP)
+for host in node02 node04 node03; do
   ssh -o BatchMode=yes -o ConnectTimeout=8 "$host" \
-    "docker rm -f \$(docker ps -aq --filter name=vllm028-tp4-rank) \$(docker ps -aq --filter name=vllm-tp4-rank) 2>/dev/null" >/dev/null 2>&1 || true
+    "docker rm -f \$(docker ps -aq --filter name=vllm-tp4-rank) \$(docker ps -aq --filter name=vllm-tp4-rank) 2>/dev/null" >/dev/null 2>&1 || true
 done
+# GID 预检 (W9R15 2026-09-03): 对端硬断电可致本机 RoCE GID idx3 全零 -> NCCL 建链必败
+# (rank0: ibv_modify_qp errno 61, local GID ::). 空 GID 先 nmcli 复位再拉起, 避免重建死循环。
+# 诊断口诀: rank0 日志 ibv_modify_qp errno 61 = 先查 GID, 勿误判为 NCCL/驱动问题。
+bash /opt/_PH_INSTALL_/scripts/gid_preflight.sh --fix \
+  || echo "[gid-preflight] WARN: GID 预检后仍异常, 继续(可能非 GID 根因)"
 NO_WAIT=1 bash /home/_PH_USER_/w6-kit/start_tp4_head_v043.sh || exit 1
 echo "[i] 等待 head TCPStore :${MASTER_PORT} 就绪..."
 for i in $(seq 1 60); do
@@ -61,7 +66,7 @@ if [ "$WARMUP_READY" = "1" ]; then
   WARMUP_RC=$(curl -sf -o /dev/null -w "%{http_code}" -m 120 \
     http://127.0.0.1:8002/v1/completions \
     -H 'Content-Type: application/json' \
-    -d '{"model":"deepseek-v4-flash-0731","prompt":"warmup-cuda-graph","max_tokens":16,"stream":false}' 2>&1)
+    -d "{\"model\":\"${SERVED_MODEL_NAME:-deepseek-v4-flash-vision-exp}\",\"prompt\":\"warmup-cuda-graph\",\"max_tokens\":16,\"stream\":false}" 2>&1)
   echo "[warmup] 预热请求完成 http=$WARMUP_RC (CUDA 图首运行 + JIT kernel 编译已触发)"
 else
   echo "[warmup] 引擎 10min 内未就绪, 跳过预热 (自愈链将接管)"

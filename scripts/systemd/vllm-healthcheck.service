@@ -1,0 +1,15 @@
+[Unit]
+Description=vLLM TP4 head healthcheck + active rebuild (P1)
+Documentation=file:///opt/_PH_INSTALL_/scripts/healthcheck-rebuild.sh
+After=docker.service
+Wants=docker.service
+
+[Service]
+User=_PH_USER_
+EnvironmentFile=/opt/_PH_INSTALL_/secrets/vllm.env
+Type=oneshot
+Environment=HOME=/home/_PH_USER_
+ExecStart=/opt/_PH_INSTALL_/scripts/healthcheck-rebuild.sh --role head --cooldown 1800
+
+[Install]
+WantedBy=multi-user.target

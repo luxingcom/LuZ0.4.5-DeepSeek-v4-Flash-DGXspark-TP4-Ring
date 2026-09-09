@@ -1,3 +1,8 @@
+# VL-FINAL (2026-09-08) LuZ0.4.5-DeepSeek-v4-Flash-VL-DGXspark-TP4-Ring
+# 定稿形态: baked7f1 镜像 + FULL_AND_PIECEWISE + dspark k=6 (VL 检查点 n_predict=3, k 必须∈{3,6})
+# 相对生产基线(.bak-window-20260907)仅 6 处差异: 镜像tag/权重挂载dsv4-vision-exp/served名/skip-ops env/-f1 双缓存卷/k6
+# 缓存卷 ~/flashinfer-cache-f1 + ~/tilelang-cache-f1 为 F1(453aa7c) 专用, 勿与生产卷混用(防 stale .so)
+# 部署/回退/验收门见 ~/w6-kit/G1R7VL-BASELINE-DELIVERY-20260908.md; 重启必须走 w9r4_restart_guard.sh
 #!/bin/bash
 # ==============================================================
 # SCRIPT: start_tp4_head_v043.sh
@@ -22,7 +27,7 @@
 #   tonyd2wild 归档 w6-kit/reference/GLM-5.3-Flash-NVFP4-1M-KV-4x-DGX-Spark/ (8 项 GB10 修复/dflash2 overlay/取证)
 #   W4A4 自研内核  /opt/_PH_INSTALL_/nvfp4/ (routeA kernel1/v17 kernel2/plugin-src/routeb_official_v2 + docs/)
 #   0.26 生产档案  /opt/_PH_INSTALL_/backup/luz031-checkpoint-20260823/ (LuZ0.3.1 参考基线 2950/108.84/3057)
-#   服务器02(<MGMT_OCTET>) 家目录: 0.26 时代全套测试资料(已归档)
+#   服务器02(.187) 家目录: 0.26 时代全套测试资料(tessa/gw4000/v026r)
 # 已修复雷点(勿回退):
 #   ① persistent_topk >24K 上下文必崩(GB10 48SM/99KB) → SM≥78 门控已烘焙入镜像(DEEP-DECODE 29K PASS)
 #   ② flashinfer<0.6.18 缺 topk=192 → 0.6.18 已烘焙(DSpark graphs 11/11 铁证判据)
@@ -31,13 +36,12 @@
 # 密码纪律: sudo=_PH_PASSWORD_ | 集群钟慢本地 8h | docker rm 重建才刷新挂载
 # 保留挂载(数据类): /models(ro) /var/log/vllm(rw) flashinfer-cache/tilelang-cache(rw)
 # 移除挂载(已烘焙): fi18-wheels / indexer补丁 / libncclpin.so / nccl-ringonly / nccl-w7.conf
-#   (libncclpin 兼容: 若宿主仍存在该库文件则条件挂载,否则用镜像内烘焙版——v0.4.5-baked 已内置)
 # ==============================================================
 set -uo pipefail
 export HOME=/home/_PH_USER_
-NAME="vllm028-tp4-rank0"
+NAME="vllm-tp4-rank0"
 KIT=/home/_PH_USER_/w6-kit
-R5="REGISTRY_HOST:5000/vllm/vllm-openai:LuZ0.4.5-DeepSeek-v4-Flash-DGXspark-TP4-Ring-baked"
+R5="REGISTRY_HOST:5000/vllm/vllm-openai:LuZ0.4.5-DeepSeek-v4-Flash-VL-DGXspark-TP4-Ring"
 ENVS=""
 while IFS='=' read -r k v; do ENVS="$ENVS -e $k=$v"; done < <(grep -v '^\s*#' $KIT/w6_env.txt | grep -v '^\s*$')
 mkdir -p /home/_PH_USER_/vllm-logs /tmp/vllm-crash
@@ -47,20 +51,20 @@ docker run -d --name $NAME --gpus all --privileged --shm-size 64g \
   --ipc=host --network host --cpuset-cpus=1-19 --memory 116g --memory-swap 116g \
   -e PYTHONFAULTHANDLER=1 \
   $ENVS \
-  -e NODE_RANK=0 -e MASTER_ADDR=_PH_NODE_IP_ -e MASTER_PORT=26000 \
+  -e VLLM_FLASHINFER_AUTOTUNE_SKIP_OPS=sparse_mla_sm120 -e NODE_RANK=0 -e MASTER_ADDR=_PH_NODE_IP_ -e MASTER_PORT=26000 \
   -e VLLM_HOST_IP=_PH_NODE_IP_ \
-  -v /opt/_PH_INSTALL_/models/deepseek-v4-flash-0731:/models:ro \
-  $( [ -f /opt/_PH_INSTALL_/lib/libncclpin.so ] && echo "-v /opt/_PH_INSTALL_/lib/libncclpin.so:/opt/libncclpin.so:ro" ) \
+  -v /opt/_PH_INSTALL_/models/dsv4-vision-exp:/models:ro \
+  -v /opt/_PH_INSTALL_/lib/libncclpin.so:/opt/libncclpin.so:ro \
   -v /home/_PH_USER_/vllm-logs:/var/log/vllm \
-  -v /home/_PH_USER_/flashinfer-cache:/root/.cache/flashinfer:rw \
-  -v /home/_PH_USER_/tilelang-cache:/root/.cache/tilelang:rw \
+  -v /home/_PH_USER_/flashinfer-cache-f1:/root/.cache/flashinfer:rw \
+  -v /home/_PH_USER_/tilelang-cache-f1:/root/.cache/tilelang:rw \
   -v /home/_PH_USER_/b12x-cache:/root/.cache/b12x:rw \
   -v /home/_PH_USER_/vllm-cache:/root/.cache/vllm:rw \
   --health-cmd "curl -sf -o /dev/null -m 30 http://127.0.0.1:8002/health || exit 1" \
   --health-interval 30s --health-timeout 35s --health-retries 5 --health-start-period 900s \
   --log-opt max-size=100m --log-opt max-file=3 \
   --entrypoint /bin/bash \
-  $R5 -lc "export LD_PRELOAD='/opt/libncclpin.so /opt/nccl-ringonly/libnccl.so.2' && vllm serve --model /models --served-model-name deepseek-v4-flash-0731 \
+  $R5 -lc "export LD_PRELOAD='/opt/libncclpin.so /opt/nccl-ringonly/libnccl.so.2' && vllm serve --model /models --served-model-name deepseek-v4-flash-vision-exp \
   --kv-cache-dtype fp8_ds_mla \
   --max-model-len 600000 --max-num-seqs 12 --max-num-batched-tokens 4096 \
   --long-prefill-token-threshold 2048 \
@@ -70,7 +74,7 @@ docker run -d --name $NAME --gpus all --privileged --shm-size 64g \
   --scheduling-policy priority \
   --distributed-executor-backend mp --distributed-timeout-seconds 1800 \
   --compilation-config '{\"cudagraph_mode\":\"FULL_AND_PIECEWISE\"}' \
-  --speculative-config '{\"method\":\"dspark\",\"num_speculative_tokens\":7,\"draft_sample_method\":\"probabilistic\"}' \
+  --speculative-config '{\"method\":\"dspark\",\"num_speculative_tokens\":6,\"draft_sample_method\":\"probabilistic\"}' \
   --attention-backend FLASHINFER_MLA_SPARSE_DSV4 \
   --max-cudagraph-capture-size 96 \
   --cudagraph-capture-sizes 1 2 4 8 16 24 32 36 40 48 56 64 72 80 88 96 \
@@ -78,5 +82,5 @@ docker run -d --name $NAME --gpus all --privileged --shm-size 64g \
   --load-format safetensors \
   --port 8002 \
   --tensor-parallel-size 4 --nnodes 4 --node-rank 0 \
-  --master-addr _PH_NODE_IP_ --master-port 26000"
+  --master-addr _PH_HEAD_IP_.186 --master-port 26000"
 echo "[v044] head 容器已启动: $NAME (port 8002, 镜像烘焙态: FI0.6.18+indexer门控+ringonly-v5)"

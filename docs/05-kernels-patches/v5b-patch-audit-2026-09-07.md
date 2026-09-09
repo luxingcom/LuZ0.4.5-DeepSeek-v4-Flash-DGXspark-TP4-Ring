@@ -1,4 +1,4 @@
-# Code Review: V5b 五补丁逐行审计（digest bb22a8c7，B窗1 落地批次）
+# Code Review: V5b 五补丁逐行审计（digest <BAKE_IMAGE_DIGEST>，B窗1 落地批次）
 
 - 日期：2026-09-07
 - 审查人：code-reviewer（只读审计，零生产变更；发现问题报告，不自行修改）

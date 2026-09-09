@@ -117,7 +117,7 @@ rope_type 改动 → cos_sin_cache dtype 偏离 fp32 → `fused_inv_rope_fp8_qua
 
 | # | 行动 | 命令要点 | 预期 |
 |---|---|---|---|
-| 1 | 同步 w6_env 至三台 worker | `scp node0X:~/w6-kit/w6_env.txt dgxspark0{2,3,4}:~/w6-kit/` 后 `md5sum` 四机核对 = b4ae0340 | 下次 worker 重建可注入 MARKOV_REPL=0 |
+| 1 | 同步 w6_env 至三台 worker | `scp node0X:~/w6-kit/w6_env.txt node0{2,3,4}:~/w6-kit/` 后 `md5sum` 四机核对 = b4ae0340 | 下次 worker 重建可注入 MARKOV_REPL=0 |
 | 2 | **mask 旧单元**（根因②结构性闭环） | head: `printf '<PASSWORD>' \| sudo -S systemctl mask vllm028-tp4-head`；workers 同理 mask `vllm028-tp4-worker`（逐步执行验证） | `systemctl is-enabled` = masked；任何 `start vllm028-*` 直接失败 |
 | 3 | 修正 head 副本 worker start 脚本镜像 tag | 以 worker 版（31d60685）覆盖 head 副本，或改 L20 R5=…-V5b，md5 备案 | head 副本与 worker 执行版一致，防误分发旧镜像 |
 | 4 | disable 并存的 proxy v1 | `sudo systemctl disable concurrency-proxy.service`（当前 v1 inactive/v2 active，均 enabled → 重启后 :8001 竞争风险） | `is-enabled v1 = disabled` |

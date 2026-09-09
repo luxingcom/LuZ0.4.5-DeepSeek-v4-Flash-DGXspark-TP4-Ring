@@ -43,18 +43,18 @@ done
 
 NAME=""
 if [ -z "$ROLE" ]; then
-  if docker ps --format '{{.Names}}' | grep -qx 'vllm028-tp4-rank0'; then
-    ROLE=head; NAME=vllm028-tp4-rank0
-  elif docker ps --format '{{.Names}}' | grep -qE '^vllm028-tp4-rank[1-3]$'; then
-    ROLE=worker; NAME=$(docker ps --format '{{.Names}}' | grep -E '^vllm028-tp4-rank[1-3]$' | head -1)
+  if docker ps --format '{{.Names}}' | grep -qx 'vllm-tp4-rank0'; then
+    ROLE=head; NAME=vllm-tp4-rank0
+  elif docker ps --format '{{.Names}}' | grep -qE '^vllm-tp4-rank[1-3]$'; then
+    ROLE=worker; NAME=$(docker ps --format '{{.Names}}' | grep -E '^vllm-tp4-rank[1-3]$' | head -1)
   else
-    echo "[healthcheck-hard][${ROLE:-?}] 未找到 vllm028-tp4-rank* 容器 (本机非 TP4 成员或服务未拉起)"
+    echo "[healthcheck-hard][${ROLE:-?}] 未找到 vllm-tp4-rank* 容器 (本机非 TP4 成员或服务未拉起)"
     exit 1
   fi
 else
   case "$ROLE" in
-    head)   NAME=vllm028-tp4-rank0 ;;
-    worker) NAME=$(docker ps --format '{{.Names}}' | grep -E '^vllm028-tp4-rank[1-3]$' | head -1) ;;
+    head)   NAME=vllm-tp4-rank0 ;;
+    worker) NAME=$(docker ps --format '{{.Names}}' | grep -E '^vllm-tp4-rank[1-3]$' | head -1) ;;
     *) echo "role 必须是 head|worker" >&2; exit 2 ;;
   esac
 fi

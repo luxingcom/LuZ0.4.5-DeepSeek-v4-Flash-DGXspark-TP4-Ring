@@ -54,3 +54,8 @@ VLLM_B12X_SHARED_WRAPPER=1
 VLLM_FLASHINFER_AUTOTUNE_CACHE_DIR=/root/.cache/vllm/autotune-g1r6
 # W9R10 window2 TILE_CAP=0 20260902
 VLLM_MOE_DYNAMIC_TILE_CAP=0
+
+# ---- B窗1 审计护栏 2026-09-07（Cody 审计裁定）----
+# B1 Markov replicate：finalize_replication 只改权重未改 forward（VocabParallelEmbedding 按 id-vocab_start 查本地行），
+# 全表替换后 rank1-3 查错行导致静默数值错乱。禁用直至 forward 适配重写。
+VLLM_DSPARK_MARKOV_REPL=0

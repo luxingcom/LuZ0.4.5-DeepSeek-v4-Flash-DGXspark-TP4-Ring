@@ -2,7 +2,7 @@
 
 - **日期**: 2026-09-07
 - **执行人**: 泰莎（Tessa）· 测试专家
-- **被测栈**: 4× DGX Spark GB10 TP4 集群，DeepSeek V4 Flash，现役镜像 LuZ0.4.5-V5b fix2（registry digest `sha256:bb22a8c7`，k=7 MTP）
+- **被测栈**: 4× DGX Spark GB10 TP4 集群，DeepSeek V4 Flash，现役镜像 LuZ0.4.5-V5b fix2（registry digest `sha256:<BAKE_IMAGE_DIGEST>`，k=7 MTP）
 - **测试入口**: 仅经网关 `http://127.0.0.1:8001/v1/chat/completions`（node01 本机经 `ssh node0X`），`Authorization: Bearer <BEARER>`，model=`deepseek-v4-flash-0731`。未触碰 8002 直连（iptables 白名单生效，纪律性规避）。
 - **服务端确认**: `/v1/models` 返回 `system_fingerprint: vllm-0.26.1.dev0+gd3d3b2cca.d20260805-tp4-cabf9135`，`max_model_len=600000`（500K 档可容纳）。
 

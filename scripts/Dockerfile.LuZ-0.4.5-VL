@@ -1,0 +1,98 @@
+# Dockerfile.LuZ-0.4.5-VL — G1R7-VL: PR#54566 移植（24 文件 = 20 改 + 4 新，含 mm_preprocess fork 垫片）
+# FROM 检查点 LuZ0.4.5-DeepSeek-v4-Flash-DGXspark-TP4-Ring
+FROM REGISTRY_HOST:5000/vllm/vllm-openai:LuZ0.4.5-DeepSeek-v4-Flash-DGXspark-TP4-Ring
+
+COPY vllm/config/model.py /usr/local/lib/python3.12/dist-packages/vllm/config/model.py
+COPY vllm/config/vllm.py /usr/local/lib/python3.12/dist-packages/vllm/config/vllm.py
+COPY vllm/model_executor/layers/fused_moe/layer.py /usr/local/lib/python3.12/dist-packages/vllm/model_executor/layers/fused_moe/layer.py
+COPY vllm/model_executor/layers/fused_moe/router/dsv4_topk.py /usr/local/lib/python3.12/dist-packages/vllm/model_executor/layers/fused_moe/router/dsv4_topk.py
+COPY vllm/model_executor/layers/fused_moe/router/fused_topk_bias_router.py /usr/local/lib/python3.12/dist-packages/vllm/model_executor/layers/fused_moe/router/fused_topk_bias_router.py
+COPY vllm/model_executor/layers/fused_moe/router/router_factory.py /usr/local/lib/python3.12/dist-packages/vllm/model_executor/layers/fused_moe/router/router_factory.py
+COPY vllm/model_executor/models/config.py /usr/local/lib/python3.12/dist-packages/vllm/model_executor/models/config.py
+COPY vllm/model_executor/models/registry.py /usr/local/lib/python3.12/dist-packages/vllm/model_executor/models/registry.py
+COPY vllm/models/deepseek_v4/attention.py /usr/local/lib/python3.12/dist-packages/vllm/models/deepseek_v4/attention.py
+COPY vllm/models/deepseek_v4/common/mm_preprocess.py /usr/local/lib/python3.12/dist-packages/vllm/models/deepseek_v4/common/mm_preprocess.py
+COPY vllm/models/deepseek_v4/common/ops/cache_utils.py /usr/local/lib/python3.12/dist-packages/vllm/models/deepseek_v4/common/ops/cache_utils.py
+COPY vllm/models/deepseek_v4/common/vision.py /usr/local/lib/python3.12/dist-packages/vllm/models/deepseek_v4/common/vision.py
+COPY vllm/models/deepseek_v4/__init__.py /usr/local/lib/python3.12/dist-packages/vllm/models/deepseek_v4/__init__.py
+COPY vllm/models/deepseek_v4/nvidia/flashinfer_sparse.py /usr/local/lib/python3.12/dist-packages/vllm/models/deepseek_v4/nvidia/flashinfer_sparse.py
+COPY vllm/models/deepseek_v4/nvidia/flashmla.py /usr/local/lib/python3.12/dist-packages/vllm/models/deepseek_v4/nvidia/flashmla.py
+COPY vllm/models/deepseek_v4/nvidia/model.py /usr/local/lib/python3.12/dist-packages/vllm/models/deepseek_v4/nvidia/model.py
+COPY vllm/models/deepseek_v4/nvidia/mtp.py /usr/local/lib/python3.12/dist-packages/vllm/models/deepseek_v4/nvidia/mtp.py
+COPY vllm/models/deepseek_v4/nvidia/vl_model.py /usr/local/lib/python3.12/dist-packages/vllm/models/deepseek_v4/nvidia/vl_model.py
+COPY vllm/models/deepseek_v4/vl_stub.py /usr/local/lib/python3.12/dist-packages/vllm/models/deepseek_v4/vl_stub.py
+COPY vllm/tokenizers/deepseek_v4_encoding.py /usr/local/lib/python3.12/dist-packages/vllm/tokenizers/deepseek_v4_encoding.py
+COPY vllm/transformers_utils/configs/deepseek_v4.py /usr/local/lib/python3.12/dist-packages/vllm/transformers_utils/configs/deepseek_v4.py
+COPY vllm/transformers_utils/model_arch_config_convertor.py /usr/local/lib/python3.12/dist-packages/vllm/transformers_utils/model_arch_config_convertor.py
+COPY vllm/v1/attention/backends/mla/sparse_swa.py /usr/local/lib/python3.12/dist-packages/vllm/v1/attention/backends/mla/sparse_swa.py
+COPY vllm/v1/worker/gpu_model_runner.py /usr/local/lib/python3.12/dist-packages/vllm/v1/worker/gpu_model_runner.py
+
+RUN python3 - <<'PYEOF'
+import py_compile, hashlib, os, importlib.util
+
+MD5_EXPECTED = {
+    "vllm/config/model.py": "f10c3a2b8fa6ca95af57b8e182c62612",
+    "vllm/config/vllm.py": "ac978b63803ff850978dac9db1fbf81c",
+    "vllm/model_executor/layers/fused_moe/layer.py": "e7578d71a1657b4af43872610b182014",
+    "vllm/model_executor/layers/fused_moe/router/dsv4_topk.py": "96880b985b5b62c88ed4b82b944297ea",
+    "vllm/model_executor/layers/fused_moe/router/fused_topk_bias_router.py": "4669daab452f66c42a91fc2c238c8049",
+    "vllm/model_executor/layers/fused_moe/router/router_factory.py": "73dde1779e49055c405cf0f4e68bf6c7",
+    "vllm/model_executor/models/config.py": "ab9dfa20aeaf84bfc89d67287c1b3609",
+    "vllm/model_executor/models/registry.py": "99d4b32ad28071587793b534f785d9ed",
+    "vllm/models/deepseek_v4/attention.py": "3bb68956e4dc8b7e1db126e445343741",
+    "vllm/models/deepseek_v4/common/mm_preprocess.py": "7850af7bb48222711a6de983501f2310",
+    "vllm/models/deepseek_v4/common/ops/cache_utils.py": "a6321503c81a68aae70955f5b0b3b247",
+    "vllm/models/deepseek_v4/common/vision.py": "fbd9e430cae3ebf81368a68ffd63f242",
+    "vllm/models/deepseek_v4/__init__.py": "b008afa97c1277a0c802b96ec6d94875",
+    "vllm/models/deepseek_v4/nvidia/flashinfer_sparse.py": "15d0f9ac9d6ff843495627bed14db637",
+    "vllm/models/deepseek_v4/nvidia/flashmla.py": "ec855d03f660110a1ce315b85df30fcd",
+    "vllm/models/deepseek_v4/nvidia/model.py": "51b5a50bae24ecf7c01d5aa63fce5137",
+    "vllm/models/deepseek_v4/nvidia/mtp.py": "6eac5f22a8a06ecfd30651d4a20453a4",
+    "vllm/models/deepseek_v4/nvidia/vl_model.py": "671c430025b983d08aae5b7542139639",
+    "vllm/models/deepseek_v4/vl_stub.py": "afa0ea484b6516b3386d48a72e56330c",
+    "vllm/tokenizers/deepseek_v4_encoding.py": "c8f1a3b5c3169f796b14aabfab98a9ab",
+    "vllm/transformers_utils/configs/deepseek_v4.py": "a930917cf7186463c9e4c28fe310f076",
+    "vllm/transformers_utils/model_arch_config_convertor.py": "0f1bdc1c0d0cc688b3d0848d54b62ebc",
+    "vllm/v1/attention/backends/mla/sparse_swa.py": "2d05a706a51c7e580a7f558e74e831cf",
+    "vllm/v1/worker/gpu_model_runner.py": "6d2435ec53e04a3f3c2f60bc86b4d332",
+}
+BASE = "/usr/local/lib/python3.12/dist-packages"
+
+fails = []
+for rel, expected in MD5_EXPECTED.items():
+    p = os.path.join(BASE, rel)
+    py_compile.compile(p, doraise=True)
+    got = hashlib.md5(open(p, "rb").read()).hexdigest()
+    if got != expected:
+        fails.append((rel, got, expected))
+assert not fails, fails
+
+enc_path = os.path.join(BASE, "vllm/tokenizers/deepseek_v4_encoding.py")
+spec = importlib.util.spec_from_file_location("enc_vl_chk", enc_path)
+m = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(m)
+assert m.IMAGE_PLACEHOLDER == "<｜deepseek_image｜>"
+assert m.flatten_content_blocks([{"type": "text", "text": "a"},
+    {"type": "image_url"}]) == "a<｜deepseek_image｜>"
+assert m.flatten_content_blocks("plain") == "plain"
+assert 'name="arguments"' in m.encode_arguments_to_dsml(
+    {"name": "f", "arguments": ""})
+
+reg = open(os.path.join(BASE, "vllm/model_executor/models/registry.py")).read()
+assert '"DeepseekV4ForConditionalGeneration"' in reg
+conv = open(os.path.join(BASE,
+    "vllm/transformers_utils/model_arch_config_convertor.py")).read()
+assert '== ["DeepseekV4ForCausalLM"]' in conv
+
+# 重链 import 冒烟（CPU-only; mm_preprocess 垫片走 fork _find_matches）
+import vllm.models.deepseek_v4 as dsv4
+assert hasattr(dsv4, "DeepseekV4ForConditionalGeneration")
+assert hasattr(dsv4, "DeepseekV4ForCausalLM")
+from vllm.model_executor.layers.fused_moe.router import fused_topk_bias_router
+assert hasattr(fused_topk_bias_router, "_apply_vl_routing_image_rows")
+from vllm.models.deepseek_v4.common import mm_preprocess
+assert hasattr(mm_preprocess, "_plan_prompt_updates")
+assert mm_preprocess.IMAGE_SENTINEL_BASE_ID == 129257
+
+print("G1R7-VL-BAKE-OK files=%d" % len(MD5_EXPECTED))
+PYEOF

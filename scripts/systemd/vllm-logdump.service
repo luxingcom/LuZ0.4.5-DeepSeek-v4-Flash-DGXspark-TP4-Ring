@@ -1,0 +1,22 @@
+[Unit]
+Description=vLLM TP4 crash forensics log dumper (survives container deletion)
+Documentation=file:/opt/_PH_INSTALL_/scripts/vllm_logdump.sh
+After=docker.service
+Wants=docker.service
+
+[Service]
+Type=simple
+User=_PH_USER_
+Environment=HOME=/home/_PH_USER_
+Environment=LOGDUMP_DIR=/opt/_PH_INSTALL_/backup/vllm-logdump
+Environment=LOGDUMP_INTERVAL=5
+ExecStart=/opt/_PH_INSTALL_/scripts/vllm_logdump.sh
+Restart=always
+RestartSec=3
+KillMode=mixed
+TimeoutStopSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
