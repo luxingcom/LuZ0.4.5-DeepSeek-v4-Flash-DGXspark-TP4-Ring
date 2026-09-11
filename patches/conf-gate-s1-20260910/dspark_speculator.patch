@@ -1,0 +1,144 @@
+--- vllm/v1/worker/gpu/spec_decode/dspark/speculator.py	2026-09-10 10:27:22.656926900 +0800
++++ vllm/v1/worker/gpu/spec_decode/dspark/speculator.py	2026-09-10 12:35:12.188544800 +0800
+@@ -21,18 +21,30 @@
+ 
+ CUDA graphs (FULL, mirroring DFlash) cover the whole draft step: the parallel
+ backbone forward AND the sequential Markov sampling.
++
++[S1] Confidence-gated per-request verification truncation: when
++VLLM_DSPARK_CONF_GATE=1 the speculator additionally computes per-position
++acceptance confidences inside the captured draft step (writing into
++preallocated fixed-shape buffers), stages them to pinned CPU buffers with a
++non-blocking D2H after the graph replay, and exposes the last-completed
++step's confidences to the scheduler via ``get_stale_confidences`` (stale
++double-buffer, #47808 style: one-step lag, zero GPU sync).
+ """
+ 
+ from typing import Any
+ 
++import numpy as np
+ import torch
+ 
+ from vllm.config import VllmConfig
+ from vllm.config.compilation import CUDAGraphMode
++from vllm.logger import init_logger
+ from vllm.v1.worker.gpu.sample.gumbel import gumbel_sample
+ from vllm.v1.worker.gpu.spec_decode.dflash.speculator import DFlashSpeculator
+ from vllm.v1.worker.gpu.spec_decode.dspark.utils import load_dspark_model
+ 
++logger = init_logger(__name__)
++
+ 
+ class DSparkSpeculator(DFlashSpeculator):
+     _speculator_name = "DSpark"
+@@ -72,6 +84,13 @@
+         self._d2t_scatter_index: torch.Tensor | None = None
+         self._draft_scatter_buf: torch.Tensor | None = None
+ 
++        # [S1-P0-1] Confidence staging is enabled in load_draft_model() below,
++        # NOT here: self.model does not exist yet during __init__ (it is
++        # assigned in DraftModelSpeculator.load_model -> load_draft_model),
++        # so any gate check here would silently never fire (Cody P0-1).
++        # Gate-off => stays False => nothing allocated, zero behavior change.
++        self._conf_enabled = False
++
+     def load_draft_model(
+         self,
+         target_model: torch.nn.Module,
+@@ -94,6 +113,44 @@
+                 dtype=self.draft_logits.dtype,
+                 device=self.device,
+             )
++
++        # [S1-P0-1] Confidence staging enablement + buffer allocation live
++        # HERE (post model load): ``model`` is the freshly loaded draft model
++        # (the future self.model), so the gate check actually fires when
++        # VLLM_DSPARK_CONF_GATE=1 and the head was wired. Buffer sizes match
++        # the capture envelope (fixed shapes; written inside the captured
++        # draft step, copied out with a non-blocking D2H outside capture).
++        # G1-T2 log hook: this info line is the wiring evidence.
++        self._conf_enabled = (
++            self.num_speculative_steps > 0
++            and getattr(model, "confidence_head", None) is not None
++        )
++        if self._conf_enabled:
++            n_spec = self.num_speculative_steps
++            self._conf_gpu_buf = torch.zeros(
++                self.max_num_reqs,
++                n_spec,
++                dtype=torch.float32,
++                device=self.device,
++            )
++            self._conf_cpu_stage = [
++                torch.zeros(
++                    self.max_num_reqs,
++                    n_spec,
++                    dtype=torch.float32,
++                    pin_memory=True,
++                )
++                for _ in range(2)
++            ]
++            self._conf_d2h_events = [torch.cuda.Event() for _ in range(2)]
++            self._conf_step = 0
++            logger.info(
++                "[S1] DSpark confidence staging enabled: conf buffer "
++                "[%d, %d] fp32 (max_num_reqs=%d), stale double-buffer D2H",
++                self.max_num_reqs,
++                n_spec,
++                self.max_num_reqs,
++            )
+         return model
+ 
+     def _sample_sequential(self, num_reqs: int, head_hidden: torch.Tensor) -> None:
+@@ -147,6 +204,17 @@
+             self.draft_tokens[:num_reqs, i] = draft_sampled_i
+             prev = draft_sampled_i
+ 
++            # [S1] Per-step confidence into the preallocated GPU buffer.
++            # Capture-safe: fixed shape, no allocation, no sync. Step i's
++            # head hidden slice is sample_hidden[i::n_spec] — (req, step)
++            # ordering, exactly the rows consumed for step i.
++            if self._conf_enabled:
++                conf_i = self.model.compute_confidence(
++                    sample_hidden[i::n_spec], markov_embed
++                )
++                # conf_i: fp32 [num_reqs] (sigmoid squeezed).
++                self._conf_gpu_buf[:num_reqs, i] = conf_i.view(-1)
++
+     def _generate_draft(
+         self,
+         num_reqs: int,
+@@ -166,3 +234,33 @@
+             cudagraph_runtime_mode,
+         )
+         self._sample_sequential(num_reqs, head_hidden)
++
++        # [S1] Non-blocking D2H of the confidence buffer. MUST run outside the
++        # captured region (this method is the replay entry); the copy is
++        # enqueued on the current stream after replay, ordered by an event the
++        # CPU-side consumer waits on. Zero device synchronization.
++        if self._conf_enabled:
++            stage = self._conf_step % 2
++            self._conf_cpu_stage[stage][:num_reqs].copy_(
++                self._conf_gpu_buf[:num_reqs], non_blocking=True
++            )
++            self._conf_d2h_events[stage].record()
++            self._conf_step += 1
++
++    def get_stale_confidences(self, num_reqs: int) -> np.ndarray | None:
++        """[S1] Last completed draft step's confidences, [num_reqs, k] fp32.
++
++        Stale double-buffer semantics (#47808): the scheduler consumes step
++        N-1's confidences to size step N's per-request verification lengths —
++        a one-step lag with no GPU sync. The event-level wait only blocks the
++        host until the D2H copy completes (it usually already has); it never
++        stalls the device.
++
++        Returns None when the confidence head is not wired (gate off), which
++        callers must treat as "keep the static k verification length".
++        """
++        if not self._conf_enabled or self._conf_step == 0:
++            return None
++        stage = (self._conf_step - 1) % 2
++        self._conf_d2h_events[stage].synchronize()
++        return self._conf_cpu_stage[stage][:num_reqs].numpy()

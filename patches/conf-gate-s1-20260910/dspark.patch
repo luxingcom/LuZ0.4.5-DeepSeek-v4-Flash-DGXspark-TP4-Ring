@@ -1,0 +1,93 @@
+--- vllm/models/deepseek_v4/nvidia/dspark.py	2026-09-10 10:19:02.398312900 +0800
++++ vllm/models/deepseek_v4/nvidia/dspark.py	2026-09-10 10:57:37.553589000 +0800
+@@ -123,6 +123,24 @@
+             replicate=os.environ.get("VLLM_DSPARK_MARKOV_REPL", "") == "1",
+         )
+ 
++        # [S1] Confidence head (DSpark AcceptRatePredictor). Created only when
++        # VLLM_DSPARK_CONF_GATE=1 so that gate-off keeps parameters/state_dict
++        # bit-identical to the pre-S1 model (G4 rollback anchor: no new module,
++        # no new checkpoint consumption, remap keeps dropping the weight).
++        # Weight: mtp.{last}.confidence_head.proj.weight (4352 -> 1), fp32,
++        # no bias; semantics mirrored from the checkpoint reference
++        # implementation (/models/inference/model.py DSparkConfidenceHead).
++        self.confidence_head: ReplicatedLinear | None = None
++        if os.environ.get("VLLM_DSPARK_CONF_GATE", "") == "1":
++            self.confidence_head = ReplicatedLinear(
++                config.hidden_size + config.dspark_markov_rank,
++                1,
++                bias=False,
++                params_dtype=torch.float32,
++                return_bias=False,
++                prefix=maybe_prefix(prefix, "confidence_head"),
++            )
++
+     def _apply_draft_topk_override(self) -> None:
+         """V5b-B2: cap draft-model MoE top-k (env VLLM_DSPARK_DRAFT_TOPK=<n>).
+         Overrides router.top_k / moe intermediate size coupling / n_activated_experts
+@@ -377,6 +395,31 @@
+     def markov_bias(self, markov_embed: torch.Tensor) -> torch.Tensor:
+         return self.model.markov_head.bias(markov_embed, self.logits_processor)
+ 
++    def compute_confidence(
++        self, head_hidden: torch.Tensor, markov_embed: torch.Tensor
++    ) -> torch.Tensor:
++        """[S1] Per-position acceptance confidence P(accept | prefix accepted).
++
++        head_hidden:  [num_sample, hidden_size] pre-norm hc_head output, i.e.
++                      the forward return value for exactly the sampled positions.
++        markov_embed: [num_sample, dspark_markov_rank] per-position Markov
++                      embedding (each sampled step's embedding for that
++                      position's request).
++        Returns fp32 sigmoid scores [num_sample, 1] -> [num_sample].
++
++        Semantics mirrored from the checkpoint reference implementation
++        (/models/inference/model.py: cat([hidden, markov_embed]) -> fp32 proj
++        -> sigmoid). Pure function: no buffer writes, no syncs, capture-safe;
++        only called when the confidence head is wired (gate on).
++        """
++        assert self.model.confidence_head is not None
++        x = torch.cat(
++            [head_hidden.to(torch.float32), markov_embed.to(torch.float32)],
++            dim=-1,
++        )
++        logits = self.model.confidence_head(x)
++        return torch.sigmoid(logits.squeeze(-1))
++
+     # --- Weight loading ----------------------------------------------------
+ 
+     def load_weights(self, weights: Iterable[tuple[str, torch.Tensor]]) -> set[str]:
+@@ -507,6 +550,17 @@
+         logger.info_once("DSpark draft model loaded: %d params", len(loaded_params))
+         # V5b-B1: replicate Markov tables post-load (no-op unless env set)
+         self.model.markov_head.finalize_replication()
++        # [S1] Auto-degrade when the gate is on but the checkpoint carries no
++        # confidence head weight: warn loudly and fall back to the gate-off
++        # behavior (QA G1-T2 treats this warning as a wiring bug signal).
++        if self.model.confidence_head is not None and (
++            "model.confidence_head.proj.weight" not in loaded_params
++        ):
++            logger.warning(
++                "VLLM_DSPARK_CONF_GATE=1 but the checkpoint has no "
++                "confidence_head weight; degrading to gate-off behavior."
++            )
++            self.model.confidence_head = None
+         return loaded_params
+ 
+     def _finalize_moe(self) -> None:
+@@ -523,9 +577,13 @@
+             return None
+         stage = int(m.group(1))
+         rest = m.group(2)
+-        # The confidence head is not wired into inference yet; drop its weights.
++        # [S1] Confidence head wiring: load the weight when the head module
++        # exists (gate on); otherwise keep dropping it (gate-off behavior is
++        # byte-identical to pre-S1). Mirrors upstream #47808 rewrite.
+         if rest.startswith("confidence_head."):
+-            return None
++            if self.model.confidence_head is None:
++                return None
++            return f"model.{rest}"
+         # Head-stack params live at model level (mtp.last), context combiner at
+         # model level (mtp.0); everything else is a per-layer decoder block.
+         head_prefixes = (

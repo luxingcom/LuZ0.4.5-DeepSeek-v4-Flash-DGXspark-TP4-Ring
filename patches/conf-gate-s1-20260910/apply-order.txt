@@ -1,0 +1,192 @@
+# ============================================================================
+#  S1 补丁集 —— 权威落地操作序（apply-order）
+#  项目：4× DGX Spark GB10 TP4 集群 / vLLM fork 0.26.1.dev0+gd3d3b2cca
+#  产出：s2-impl-diag（工程保障团队） 日期：2026-09-10
+#  性质：仅供 build 使用；本文件由实测得出，SRE 可零判断照抄
+# ============================================================================
+#
+#  ┌──────────────────────────────────────────────────────────────────────┐
+#  │ 结论（核心问题）：序 A 与 序 B 等价。                                │
+#  │ 两序在 scheduler.py 上产出【逐字节相同】的终态                       │
+#  │   md5 = 1c344c8284f566eb7dde4d3816691332                            │
+#  │ 等价原因见文末「等价性论证」。                                       │
+#  │ 不需产出合并补丁（scheduler_verify_merged.patch）——两条可干净连续    │
+#  │ apply（实测 9/9 + 6/6 hunks，零 fuzz 零 offset）。                  │
+#  └──────────────────────────────────────────────────────────────────────┘
+#
+#  ┌──────────────────────────────────────────────────────────────────────┐
+#  │ ★ 07. 现役镜像 VL-S1-20260910b 实际状态（09-10 实测更正）             │
+#  ├──────────────────────────────────────────────────────────────────────┤
+#  │ 镜像 RepoDigest = sha256:<BAKE_IMAGE_DIGEST> （四机一致）
+#  │ 镜像内 scheduler.py md5 = f95874aa23342a2292508aea4ad83775
+#  │     → 即【步 3/步 4 之后】的中间态（scheduler_verify 已套，w5 未套）
+#  │     → 该镜像只含 4 条补丁：dspark / dspark_speculator / scheduler_verify / w1_glue
+#  │     → [S1-DIAG] 打点（w5）【不在镜像内】，属 G2 开臂后的独立后续阶段
+#  │  ⇒ 双臂 G4 验收（OLD vs NEW）只用 S1 主体，DIAG 不参与，故此为设计态非缺陷。
+#  │  ⚠️ 若后续要「DIAG 版镜像（b′）」，必须重 build + 四机分发 → 需窗口 + 可能停 unit（sudo）。
+#  └──────────────────────────────────────────────────────────────────────┘
+#
+# ----------------------------------------------------------------------------
+#  0. 硬纪律（违反即 FAIL）
+# ----------------------------------------------------------------------------
+#  (A) 统一用 `patch -p0 < <patchfile>` 的 stdin 重定向形式。
+#      ★绝不可带显式目标文件参数★（如 `patch -p0 file.py < x.patch`）。
+#      w1_glue.patch 是 outputs.py + model_runner.py + engine_core.py 的
+#      三文件联合 diff（6 hunks = 2+2+2）；带显式目标文件参数会让 patch
+#      只对单一文件套用 → 假 FAIL "2/2 hunks"。
+#  (B) 所有补丁基底 = 镜像内原版文件（见下方 base md5 表），非上游 vLLM。
+#  (C) 每步 apply 后校验该步 rc=0 且无 *.rej 文件；任一步 rc≠0 立即停。
+#  (D) 全程在同一 build workdir（repo 根）内执行，保持相对路径
+#      vllm/... 的 p0 语义。
+#
+# ----------------------------------------------------------------------------
+#  1. 输入前提（base md5 断言 —— apply 前逐项核对）
+# ----------------------------------------------------------------------------
+#  目标路径                                                    base md5
+#  ----------------------------------------------------------  --------------------------------
+#  vllm/models/deepseek_v4/nvidia/dspark.py                    497aad88e52ca3c54a3d4156326befa8
+#  vllm/v1/worker/gpu/spec_decode/dspark/speculator.py         c291c3c43b8f5f724a91c97cbd344436
+#  vllm/v1/core/sched/scheduler.py                             13e5cd2a8ffae3431a610c9680525432
+#  vllm/v1/outputs.py                                          ff58673ea2cd58b1260b47ec08ee5536
+#  vllm/v1/worker/gpu/model_runner.py                          23a3d47b3e04bd3d12421907eb6db5e1
+#  vllm/v1/engine/core.py                                      e53a9b15ef045f10044fef7348198591
+#
+#  （等价物：s1-patch-20260910/base/ 下同名 *.build.py 文件）
+#
+# ----------------------------------------------------------------------------
+#  2. 操作序（五步，严格按序）
+# ----------------------------------------------------------------------------
+#  步 1   patch -p0 < dspark.patch
+#          补丁 md5     : 1ebd6b5ba5065e9075547fcf1b042def
+#          目标文件      : vllm/models/deepseek_v4/nvidia/dspark.py
+#          期望 hunk 数  : 4       期望匹配行 : 123, 395, 550, 577
+#          期望 rc       : 0       .rej      : 无
+#          步后 md5      : fb3912ab05263b72b12ba47fa994fc2e
+#
+#  步 2   patch -p0 < dspark_speculator.patch
+#          补丁 md5     : 3a76acfa716bb3e59d83fe27dc752908
+#          目标文件      : vllm/v1/worker/gpu/spec_decode/dspark/speculator.py
+#          期望 hunk 数  : 5       期望匹配行 : 21, 84, 113, 204, 234
+#          期望 rc       : 0       .rej      : 无
+#          步后 md5      : 179a6b785432120113bfaeccc456a8f7
+#
+#  步 3   patch -p0 < scheduler_verify.patch
+#          补丁 md5     : 2a463be7e3bc1623d14b445b8c291784
+#          目标文件      : vllm/v1/core/sched/scheduler.py
+#          期望 hunk 数  : 9       期望匹配行 : 1, 265, 448, 544, 685, 705, 1246, 2146, 2266
+#          期望 rc       : 0       .rej      : 无
+#          步后 md5      : f95874aa23342a2292508aea4ad83775   <== 中间态，非终态
+#
+#  步 4   patch -p0 < w1_glue.patch
+#          补丁 md5     : 61ed1c6366d16e30fdae157169acbae6
+#          目标文件      : 三文件联合（★见纪律 A，勿带目标文件参数★）
+#                          vllm/v1/outputs.py                  → hunks 4, 280
+#                          vllm/v1/worker/gpu/model_runner.py  → hunks 1454, 1469
+#                          vllm/v1/engine/core.py              → hunks 602, 723
+#          期望 hunk 数  : 6（=2+2+2）  期望 rc : 0  .rej : 无
+#          步后 md5      : outputs.py            4554a03f87d6565ad34ffb90f0c8bdc7
+#                          model_runner.py       0ff63933ce6003851fa82139f765503f
+#                          engine_core.py        210af81383d6b7d5a0073ff79c3784ef
+#          （本步不改 scheduler.py，其三步后仍为 f95874aa…）
+#
+#  步 5   patch -p0 < w5_diag.patch          # [S1-DIAG] 三条打点（第二代）
+#          补丁 md5     : fcdbd55994c97cc819f49944b18713ea
+#          目标文件      : vllm/v1/core/sched/scheduler.py   ← 必须叠在步 3 之后
+#          期望 hunk 数  : 6       期望匹配行 : 285, 580, 1293, 2197, 2285, 2379
+#          期望 rc       : 0       .rej      : 无（零 fuzz / 零 offset）
+#          步后 md5      : 1c344c8284f566eb7dde4d3816691332   <== ★终态断言★
+#
+# ----------------------------------------------------------------------------
+#  3. 可直接粘贴的 Dockerfile / shell 片段
+# ----------------------------------------------------------------------------
+#  # ---- 复制基底（示例：从归档 base/ 铺入 build workdir）----
+#  # cp base/dspark.build.py            vllm/models/deepseek_v4/nvidia/dspark.py
+#  # cp base/dspark_speculator.build.py vllm/v1/worker/gpu/spec_decode/dspark/speculator.py
+#  # cp base/scheduler.build.py         vllm/v1/core/sched/scheduler.py
+#  # cp base/outputs.build.py           vllm/v1/outputs.py
+#  # cp base/gpu_model_runner_NEW.build.py  vllm/v1/worker/gpu/model_runner.py
+#  # cp base/engine_core.build.py       vllm/v1/engine/core.py
+#  #
+#  # ---- 五步套用（严格按序；★不可带目标文件参数★）----
+#  patch -p0 < dspark.patch
+#  patch -p0 < dspark_speculator.patch
+#  patch -p0 < scheduler_verify.patch
+#  patch -p0 < w1_glue.patch
+#  patch -p0 < w5_diag.patch
+#  #
+#  # ---- 终态断言（必做）----
+#  # test "$(md5sum vllm/v1/core/sched/scheduler.py | cut -d' ' -f1)" \
+#  #      = "1c344c8284f566eb7dde4d3816691332" || { echo E0-d FAIL; exit 1; }
+#
+#  ※ 若构建环境无 `patch`（仅 python），兜底：直接用 work/ 下补丁后完整文件
+#    覆盖（内容与五步套用逐字节一致，md5 见 §2 各步「步后 md5」）：
+#      work/dspark.py                work/dspark_speculator.py
+#      work/scheduler_diag.py   ←   ★ 注意：是 _diag 版（含 w5），非 work/scheduler.py（不含）
+#      work/w1_outputs.py            work/w1_gpu_model_runner.py
+#      work/w1_engine_core.py
+#    对应目标路径见 §1。此法免 patch 工具，但需按 §2 各步 md5 逐项断言。
+#
+# ----------------------------------------------------------------------------
+#  4. 实测存证（本次实验原始记录）
+# ----------------------------------------------------------------------------
+#  EXP1  序B（base → scheduler_verify → w5），scheduler.py：
+#        base  13e5cd2a8ffae3431a610c9680525432
+#        step1 verify : 9/9 hunks succeeded, rc=0
+#        after verify : f95874aa23342a2292508aea4ad83775  ✓
+#        step2 w5     : 6/6 hunks succeeded, rc=0, 零 fuzz 零 offset
+#        final        : 1c344c8284f566eb7dde4d3816691332  ✓ = 目标
+#
+#  EXP2  w5 单独套纯 base（负向验证）：
+#        Hunk #1 FAILED at 285 / #4 FAILED at 2192 / #5 FAILED at 2248
+#        → 3 out of 6 hunks FAILED, rc=1, 生成 scheduler.py.rej
+#        证明：w5 是增量补丁，必须叠在 scheduler_verify 之后（不可单独对 base 套）。
+#
+#  EXP3  序A（dspark → dspark_speculator → scheduler_verify → w1_glue → w5）：
+#        各步 rc=0；scheduler.py 终态 = 1c344c8284f566eb7dde4d3816691332
+#        （中间态：前三补丁后 f95874aa…，w1_glue 不改 scheduler.py）
+#
+#  EXP4  序A 终态 vs 序B 终态：cmp 逐字节 => IDENTICAL
+#        序A/序B 终态 vs work/scheduler_diag.py：IDENTICAL
+#
+#  EXP5  ast.parse：exp1 / exp3 / work.scheduler_diag.py 三份 3104 行全过。
+#
+#  EXP6  零 fuzz 审计（全新树，verify→w5）：6/6 hunks，无 fuzz 无 offset。
+#
+#  EXP11 全量五补丁后，六个目标文件 md5 与 work/ 参考逐项一致（6/6 OK）：
+#        dspark.py / speculator.py / scheduler.py / outputs.py /
+#        model_runner.py / engine_core.py
+#
+# ----------------------------------------------------------------------------
+#  5. 等价性论证：序 A ≡ 序 B（核心问题作答）
+# ----------------------------------------------------------------------------
+#  命题：base → dspark → dspark_speculator → scheduler_verify → w1_glue → w5
+#        （序 A）与 base → scheduler_verify → w5（序 B，仅取 scheduler 链）
+#        在 vllm/v1/core/sched/scheduler.py 上产出逐字节相同的文件。
+#
+#  理由（三步）：
+#   1) 文件不相交：五条补丁中，只有 scheduler_verify.patch 与 w5_diag.patch
+#      触及 scheduler.py；dspark / dspark_speculator 触及 dspark.py 与
+#      speculator.py；w1_glue 触及 outputs.py / model_runner.py / engine_core.py。
+#      → 对 scheduler.py 而言，序 A 中步 1、2、4 是 no-op，文件内容不变。
+#   2) 相对顺序一致：两序中 scheduler_verify 都在 w5 之前 apply，且二者之间
+#      无其它补丁改动 scheduler.py → w5 见到的上下文（行号基准）在两序中相同。
+#   3) 实测印证：EXP3（序 A）与 EXP1（序 B）终态 cmp 逐字节相同，
+#      且均等于 work/scheduler_diag.py。
+#
+#  ⚠️ 但"行号漂移"担忧不成立的原因正是 (1)——patch 的行号基准是【每个文件
+#     各自的当前内容】，而非全局步数。其它文件被改动不会影响 scheduler.py
+#     下一次 patch 的行号计算。故两序等价具有必然性，非巧合。
+#
+#  ⚠️ 唯一的【顺序敏感点】：w5 必须在 scheduler_verify 之后（依赖其引入的
+#     _conf_gate / _conf_lengths / _conf_lengths_frame 符号）。破坏该顺序
+#     → EXP2 所示 3/6 hunks FAILED。除此之外五补丁两两无顺序依赖。
+#
+# ----------------------------------------------------------------------------
+#  6. 终态断言（E0-d 纪律）
+# ----------------------------------------------------------------------------
+#  镜像 rebuild 后，镜像内 vllm/v1/core/sched/scheduler.py 的 md5 必须等于
+#     1c344c8284f566eb7dde4d3816691332
+#  方可通过 g1g4 元门 E0-d。★注意：不可用 boot 期 grep "[S1-DIAG]" 作为
+#  落地判据——该日志行须有请求经过 scheduler 才输出，boot 阶段必为空★。
+#
+# ============================================================================

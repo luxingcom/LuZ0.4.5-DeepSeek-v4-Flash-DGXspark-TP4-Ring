@@ -1,0 +1,255 @@
+--- vllm/v1/core/sched/scheduler.py	2026-09-10 10:27:23.278333200 +0800
++++ vllm/v1/core/sched/scheduler.py	2026-09-10 12:36:49.067241500 +0800
+@@ -1,12 +1,15 @@
+ # SPDX-License-Identifier: Apache-2.0
+ # SPDX-FileCopyrightText: Copyright contributors to the vLLM project
+ import itertools
++import os
+ import time
+ from collections import defaultdict, deque
+ from collections.abc import Iterable
+ from dataclasses import replace
+ from typing import Any
+ 
++import numpy as np
++
+ from vllm.compilation.cuda_graph import CUDAGraphStat
+ from vllm.config import VllmConfig
+ from vllm.distributed.ec_transfer.ec_connector.base import (
+@@ -262,6 +265,27 @@
+                 # query), so it needs exactly num_spec_tokens lookahead slots.
+                 self.num_lookahead_tokens = self.num_spec_tokens
+ 
++        # [S1] Confidence-gated per-request verification truncation (P1 verdict:
++        # the live stack runs AsyncScheduler, which inherits this Scheduler and
++        # its schedule(); truncation is realized via request.spec_token_ids
++        # length, which flows through schedule() -> scheduled_spec_decode_tokens
++        # -> num_scheduled_tokens -> verify metadata -> rejection sampler).
++        # Default OFF: both envs unset => no state, no code path taken.
++        self._conf_gate = (
++            speculative_config is not None
++            and speculative_config.use_dspark()
++            and os.environ.get("VLLM_DSPARK_CONF_GATE", "") == "1"
++            and self.num_spec_tokens > 0
++        )
++        self._conf_min = (
++            float(os.environ.get("VLLM_DSPARK_CONF_MIN", "0") or 0)
++            if self._conf_gate
++            else 0.0
++        )
++        self._conf_lengths: dict[str, int] = {}
++        self._conf_snapshot: Any | None = None
++        self._conf_snapshot_req_ids: list[str] | None = None
++
+         # Create the KV cache manager.
+         if hash_block_size is None:
+             hash_block_size = block_size
+@@ -424,6 +448,9 @@
+ 
+     def schedule(self, throttle_prefills: bool = False) -> SchedulerOutput:
+         self.current_step += 1
++        # [S1] Refresh per-request confidence lengths from the latest stale
++        # snapshot (no-op unless the gate is on and a snapshot arrived).
++        self._conf_pull_lengths(len(self.running))
+         # NOTE(woosuk) on the scheduling algorithm:
+         # There's no "decoding phase" nor "prefill phase" in the scheduler.
+         # Each request just has the num_computed_tokens and
+@@ -517,6 +544,37 @@
+                 - self.num_sampled_tokens_per_step,
+             )
+ 
++            # [S1-P0-2] Per-request confidence truncation applied HERE, before
++            # allocate_slots and the token_budget accounting (Cody P0-2): the
++            # cap must shape the KV allocation quantity AND the budget debit
++            # consistently. Applying it later (after allocate_slots) left KV
++            # allocated for all k slots and over-debited token_budget for the
++            # next request. Truncated spec tokens stay in
++            # request.spec_token_ids and are simply re-verified next step (a
++            # delayed draft is not a lost draft). The truncated number of
++            # spec tokens this step is remembered on the request for the
++            # async placeholder guard (update_draft_token_ids_in_output) and
++            # the spec-token scheduling block below.
++            # Gate off / no snapshot => _conf_lengths is empty => identity.
++            _conf_sched_spec_tokens = None
++            if (
++                self._conf_gate
++                and request.spec_token_ids
++                and num_new_tokens > 1
++                and not request.is_prefill_chunk
++            ):
++                l_r = self._conf_lengths.get(request.request_id)
++                if l_r is not None and l_r < len(request.spec_token_ids):
++                    # Verify length this step = min(l_r, schedulable spec
++                    # tokens): num_new_tokens currently counts 1 sampled
++                    # token + all remaining spec tokens.
++                    num_sched_spec_full = num_new_tokens - 1
++                    num_trunc = min(len(request.spec_token_ids) - l_r,
++                                    num_sched_spec_full)
++                    if num_trunc > 0:
++                        num_new_tokens -= num_trunc
++                        _conf_sched_spec_tokens = num_sched_spec_full - num_trunc
++
+             # Schedule encoder inputs.
+             encoder_inputs_to_schedule = None
+             external_load_encoder_input: list[int] = []
+@@ -627,6 +685,18 @@
+                     - request.num_tokens
+                     - request.num_output_placeholders
+                 )
++                # [S1-P0-2] The confidence cap was already applied to
++                # num_new_tokens BEFORE allocate_slots (see the scheduling loop
++                # head), so this block only needs to consume the pre-computed
++                # truncated count: it scopes scheduled_spec_decode_tokens to
++                # the truncated length, which flows into the verify metadata
++                # and the rejection sampler. (S1-P1-1: this saves verify
++                # compute; KV allocation is sized to the truncated num_new_tokens
++                # since the P0-2 move — NOT "allocated for all k".)
++                if _conf_sched_spec_tokens is not None:
++                    num_scheduled_spec_tokens = min(
++                        num_scheduled_spec_tokens, _conf_sched_spec_tokens
++                    )
+                 if num_scheduled_spec_tokens > 0:
+                     spec_token_ids = request.spec_token_ids
+                     if len(spec_token_ids) > num_scheduled_spec_tokens:
+@@ -635,7 +705,17 @@
+ 
+                 # New spec tokens will be set in `update_draft_token_ids` before the
+                 # next step when applicable.
+-                request.spec_token_ids = []
++                # [S1-P0-2] Before clearing, put back the truncated (not
++                # scheduled this step) spec tokens so they are re-verified in
++                # a later step — a delayed draft is not a lost draft.
++                if _conf_sched_spec_tokens is not None and (
++                    len(request.spec_token_ids) > _conf_sched_spec_tokens
++                ):
++                    request.spec_token_ids = request.spec_token_ids[
++                        :_conf_sched_spec_tokens
++                    ]
++                else:
++                    request.spec_token_ids = []
+ 
+             # Encoder-related.
+             if encoder_inputs_to_schedule:
+@@ -1166,6 +1246,18 @@
+             num_spec_tokens_to_schedule=num_spec_tokens_to_schedule,
+         )
+ 
++        # [S1-P1-2] Freeze this frame's confidence-length snapshot onto the
++        # scheduler_output: the async batch queue may interleave later
++        # schedule() calls (which refresh self._conf_lengths with a NEWER
++        # snapshot) before update_draft_token_ids_in_output runs for THIS
++        # frame. Using the live dict there would let the guard re-trim with
++        # mismatched lengths. The frozen copy keeps the -1 invalid-token
++        # bookkeeping consistent with the truncation actually applied to
++        # this frame. Minimal-diff variant (no SchedulerOutput field).
++        scheduler_output._conf_lengths_frame = (
++            dict(self._conf_lengths) if self._conf_gate else {}
++        )
++
+         # NOTE(Kuntai): this function is designed for multiple purposes:
+         # 1. Plan the KV cache store
+         # 2. Wrap up all the KV cache load / save ops into an opaque object
+@@ -2054,6 +2146,67 @@
+                 # rejection or drafter gather can reference it.
+                 self.encoder_cache_manager.free_encoder_input(request, input_id)
+ 
++    # ------------------------------------------------------------------
++    # [S1] Confidence-gated per-request verification truncation helpers.
++    # ------------------------------------------------------------------
++
++    def _conf_pull_lengths(self, num_reqs_expected: int) -> None:
++        """[S1] Pull the latest stale confidences from the worker-side
++        speculator snapshot and compute this step's per-request verification
++        lengths.
++
++        survival = cumprod(conf) is monotonically decreasing; a request's
++        length is the longest prefix whose survival stays >= VLLM_DSPARK_CONF_MIN
++        (#47808 formula). thr <= 0 keeps every length at the static k so the
++        gate can be enabled for observation with zero truncation.
++
++        Confidences come from ``update_confidences`` (stale by one step by
++        design; confidence curves are smooth, so a one-step lag only costs a
++        suboptimal length, never correctness — truncation is still exact
++        rejection sampling).
++        """
++        if not self._conf_gate or self._conf_snapshot is None:
++            return
++        conf = self._conf_snapshot
++        n = min(conf.shape[0], num_reqs_expected)
++        lengths: dict[str, int] = {}
++        req_ids = self._conf_snapshot_req_ids
++        if req_ids is None:
++            return
++        k = self.num_spec_tokens
++        for j in range(n):
++            req_id = req_ids[j]
++            request = self.requests.get(req_id)
++            if request is None or request.is_finished():
++                continue
++            if self._conf_min <= 0.0:
++                length = k
++            else:
++                survival = np.cumprod(conf[j].astype(np.float64))
++                ok = survival >= self._conf_min
++                length = int(ok.cumsum().argmax()) + 1 if ok[0] else 1
++                length = min(max(length, 1), k)
++            lengths[req_id] = length
++        self._conf_lengths = lengths
++        self._conf_snapshot = None
++        self._conf_snapshot_req_ids = None
++
++    def update_confidences(
++        self, req_ids: list[str], confidences: Any
++    ) -> None:
++        """[S1] Entry point for the worker side (ModelRunner output pump):
++        receive the latest stale per-request confidence matrix
++        ([num_reqs, num_spec_tokens] array-like, aligned with req_ids).
++        Must be called before schedule() consumes it for the next step.
++        No-op when the gate is off."""
++        if not self._conf_gate:
++            return
++        # [S1-P2] Explicit copy: the worker-side matrix is a view into a
++        # double-buffered staging slot that gets overwritten next step;
++        # np.array(...) detaches us from that memory.
++        self._conf_snapshot = np.array(confidences, dtype=np.float32, copy=True)
++        self._conf_snapshot_req_ids = list(req_ids)
++
+     def update_draft_token_ids(self, draft_token_ids: DraftTokenIds) -> None:
+         for req_id, spec_token_ids in zip(
+             draft_token_ids.req_ids,
+@@ -2113,6 +2266,35 @@
+ 
+         scheduler_output.num_invalid_spec_tokens = num_invalid_spec_tokens
+ 
++        # [S1] Confidence truncation guard (P1/async, Rex): AsyncScheduler
++        # schedules with placeholder spec tokens of the STATIC length k, and
++        # this function replaces the placeholders with real drafts. Without a
++        # guard the replacement would silently resurrect the slots truncated
++        # in schedule() (fixed-shape async bookkeeping pitfall, RFC #48202).
++        # Fix: after the replacement loop re-apply the per-request cap and
++        # record the re-trimmed slots as invalid so num_computed_tokens /
++        # num_output_placeholders bookkeeping matches the truncated verify.
++        # [S1-P1-2] Uses the per-frame frozen lengths snapshot
++        # (_conf_lengths_frame, set in schedule()) instead of the live
++        # self._conf_lengths: the batch queue may interleave schedule() calls
++        # between this frame's materialization and this call, and the live
++        # dict may already hold a NEWER snapshot's lengths.
++        frame_conf_lengths = getattr(
++            scheduler_output, "_conf_lengths_frame", None
++        )
++        if frame_conf_lengths:
++            for req_id, spec_token_ids in sched_spec_tokens.items():
++                l_r = frame_conf_lengths.get(req_id)
++                if l_r is None or len(spec_token_ids) <= l_r:
++                    continue
++                num_trimmed = len(spec_token_ids) - l_r
++                del spec_token_ids[l_r:]
++                spec_token_ids.extend([-1] * num_trimmed)
++                num_invalid_spec_tokens[req_id] = (
++                    num_invalid_spec_tokens.get(req_id, 0) + num_trimmed
++                )
++            scheduler_output.num_invalid_spec_tokens = num_invalid_spec_tokens
++
+     def get_request_counts(self) -> tuple[int, int]:
+         """Returns (num_running_reqs, num_waiting_reqs)."""
+         return len(self.running), len(self.waiting) + len(self.skipped_waiting)

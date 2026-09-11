@@ -1,0 +1,97 @@
+--- vllm/v1/outputs.py	2026-09-10 11:33:46.220881100 +0800
++++ vllm/v1/outputs.py	2026-09-10 11:38:18.143824800 +0800
+@@ -4,7 +4,7 @@
+ from abc import ABC, abstractmethod
+ from copy import copy
+ from dataclasses import dataclass, field
+-from typing import TYPE_CHECKING, NamedTuple, TypeAlias
++from typing import TYPE_CHECKING, Any, NamedTuple, TypeAlias
+ 
+ import numpy as np
+ import torch
+@@ -280,6 +280,13 @@
+     # ``None`` when ``enable_return_routed_experts`` is off.
+     routed_experts: RoutedExpertsLists | None = None
+ 
++    # [S1] Stale per-request draft confidences from the DSpark speculator
++    # ([num_reqs, num_spec_tokens] fp32, row-aligned with ``req_ids``; None
++    # when the confidence gate is off). Rides the existing serialized output
++    # stream through AsyncGPUModelRunnerOutput.get_output() — no new RPC,
++    # no device sync. Consumed by EngineCore -> scheduler.update_confidences.
++    stale_dspark_confidences: Any | None = None
++
+     @staticmethod
+     def with_kv_conn_output_only(
+         kv_connector_output: KVConnectorOutput | None,
+--- vllm/v1/worker/gpu/model_runner.py	2026-09-10 11:33:47.421943300 +0800
++++ vllm/v1/worker/gpu/model_runner.py	2026-09-10 11:38:57.811025300 +0800
+@@ -1454,6 +1454,14 @@
+         )
+ 
+         # Prepare the model runner output.
++        # [S1] Attach the stale DSpark confidences (step N-1's, by design:
++        # this construction runs BEFORE this step's speculator.propose(), and
++        # get_stale_confidences() returns the last completed draft step's
++        # matrix). get_stale_confidences() returns None when the confidence
++        # gate is off, so no external gate check is needed. Row alignment
++        # with req_ids holds by construction (same-scope request list; a
++        # one-step batch-composition lag is covered by the stale-is-safe
++        # argument — see scheduler._conf_pull_lengths).
+         model_runner_output = ModelRunnerOutput(
+             req_ids=input_batch.req_ids,
+             # NOTE(woosuk): req_id_to_index is unused in this model runner.
+@@ -1461,6 +1469,10 @@
+             req_id_to_index={req_id: i for i, req_id in enumerate(input_batch.req_ids)},
+             sampled_token_ids=None,  # type: ignore
+             prompt_logprobs_dict=prompt_logprobs_dict,  # type: ignore[arg-type]
++            stale_dspark_confidences=(
++                getattr(self.speculator, "get_stale_confidences", None) is not None
++                and self.speculator.get_stale_confidences(len(input_batch.req_ids))
++            ),
+         )
+         # Start async output copy here so that it can overlap with speculator proposal.
+         async_output = AsyncOutput(
+--- vllm/v1/engine/core.py	2026-09-10 11:33:46.834001500 +0800
++++ vllm/v1/engine/core.py	2026-09-10 11:39:27.159975800 +0800
+@@ -602,6 +602,25 @@
+         # Before processing the model output, process any aborts that happened
+         # during the model execution.
+         self._process_aborts_queue()
++        # [S1] Hand the stale DSpark confidences to the scheduler for next-step
++        # per-request verification lengths (update_confidences is a no-op when
++        # the confidence gate is off). Deliberately at the EngineCore
++        # materialization points rather than inside
++        # scheduler.update_from_output: the async path delivers an
++        # AsyncModelRunnerOutput wrapper there, and post_step is explicitly
++        # skipped under async scheduling — the take_draft_token_ids channel
++        # (collective_rpc sync barrier) must NOT be copied: it would inject a
++        # host sync into the async hot path and miss the async branch.
++        # Timing: under async scheduling confidences may arrive 2-step stale
++        # (propose step -> output pump -> next schedule). Staleness costs
++        # optimality only, never correctness: any per-request length choice
++        # remains exact rejection sampling.
++        if (
++            getattr(model_output, "stale_dspark_confidences", None) is not None
++        ):
++            self.scheduler.update_confidences(
++                model_output.req_ids, model_output.stale_dspark_confidences
++            )
+         engine_core_outputs = self.scheduler.update_from_output(
+             scheduler_output, model_output
+         )
+@@ -704,6 +723,15 @@
+         # Before processing the model output, process any aborts that happened
+         # during the model execution.
+         self._process_aborts_queue()
++        # [S1] Async-path materialization point (see the step() comment for
++        # why this lives here and for the staleness note): hand stale
++        # confidences to the scheduler before update_from_output.
++        if (
++            getattr(model_output, "stale_dspark_confidences", None) is not None
++        ):
++            self.scheduler.update_confidences(
++                model_output.req_ids, model_output.stale_dspark_confidences
++            )
+         engine_core_outputs = self.scheduler.update_from_output(
+             scheduler_output, model_output
+         )

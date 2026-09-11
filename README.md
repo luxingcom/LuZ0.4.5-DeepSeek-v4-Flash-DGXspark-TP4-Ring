@@ -6,7 +6,9 @@
 
 > 本分支为 VL 视觉线独立归档；文本线（V5b，k=7，served-model `deepseek-v4-flash-0731`）见 master 分支。VL 已于 2026-09-08 完成生产切换（V5b→VL），为当前现役线。
 
-**变更记录**：见 [`CHANGES-VL-2026-09-09.md`](CHANGES-VL-2026-09-09.md)（V5b→VL 生产切换 / 冷窗口 49 格全套 / GSM8K 思考预算修正 / KV 口径反转定案 / 投机头三根因排除 / 脱敏镜像分发）。
+**变更记录**：见 [`CHANGES-VL-2026-09-09.md`](CHANGES-VL-2026-09-09.md)（V5b→VL 生产切换 / 冷窗口 49 格全套 / GSM8K 思考预算修正 / KV 口径反转定案 / 投机头三根因排除 / 脱敏镜像分发）；**2026-09-10 起追加** [`CHANGES-2026-09-10.md`](CHANGES-2026-09-10.md)（S1 置信门控补丁集 / 参数组合门禁定谳 / G4 双臂验收 PASS / 自愈链冷却窗缺陷 / 接受率护栏）。
+
+**S1 置信门控补丁集（默认关门）**：现役镜像已并入主体 4 补丁（gate-off 形态，G4 双臂验收 PASS），提供 `VLLM_DSPARK_CONF_GATE` / `VLLM_DSPARK_CONF_MIN` 两个 env 门控，为 G2 开臂（置信驱动的 per-request 验证截短）提供同一镜像的开闸能力。见 [`patches/conf-gate-s1-20260910/`](patches/conf-gate-s1-20260910/README.md)。
 
 **最终性能指标**：见下方「典型性能指标」与 **[FINAL-METRICS-VL 完整测试报告](docs/03-final-metrics/FINAL-METRICS-VL-2026-09-09.md)**。
 
@@ -57,13 +59,13 @@
 
 ```
 docs/
-  01-research-reports/      研究报告（G1R7VL 历史系列 14 篇 + KV 内存分解/投机头调研/服务器取证）
-  02-performance-benchmarks/性能测试报告与基准数据
+  01-research-reports/      研究报告（G1R7VL 历史系列 14 篇 + KV 内存分解/投机头调研/服务器取证 + K 槽位控制实现路径）
+  02-performance-benchmarks/性能测试报告与基准数据（含参数组合门禁判定 gate-combo-verdict）
   03-final-metrics/          最终性能指标汇总（FINAL-METRICS-VL）
-  05-kernels-patches/        算子/kernel/补丁相关报告
-  06-verification/           验证/QA/验收（六门验收 + 网关识图测试方案 + 切换执行审计）
+  05-kernels-patches/        算子/kernel/补丁相关报告（含 S1 设计草案 + w5_diag 复审）
+  06-verification/           验证/QA/验收（六门验收 + 切换执行审计 + G4 双臂验收终判 + 接受率护栏 + G2 开臂预备）
   07-deployment/             部署/镜像脱敏/审计（服务器治理面审计 + 部署方案交叉审核）
-patches/                    补丁包（028 系列 11 件 + sparse_attn_indexer_sm121.py，共 12 件）
+patches/                    补丁包（028 系列 11 件 + sparse_attn_indexer_sm121.py + v5b-fix-batch + conf-gate-s1-20260910 置信门控 S1 补丁集）
 scripts/                    启动/部署/基准/验收脚本（脱敏版）
   start_tp4_*_v043.sh 等    head/worker 启动 + 自愈链四件（monitor 双件 / healthcheck_hardened / healthcheck-rebuild / watchdog_hardened）、w6_env.txt、Dockerfile.LuZ-0.4.5-VL、daily_smoke.py
   bench3/ benchmark/        基准套件（全量 47 件 / 现役 9 件）
@@ -87,6 +89,9 @@ data/                       基准原始数据（49 格矩阵 + ext JSON、GSM8K
 - **部署方案交叉审核**：`docs/07-deployment/vl-deployment-cross-audit-2026-09-08.md`（切换前 Review：Request Changes 有条件放行，P0-1~P0-4 阻塞项定谳）
 - **服务器治理面审计**：`docs/07-deployment/vl-governance-audit-2026-09-08.md`（持久化/自愈链/守卫链/缓存卷/回退推演，P0/P1 治理动作清单）
 - **切换执行审计**：`docs/06-verification/vl-switch-execution-audit-2026-09-08.md`（窗口事后八项复核全 PASS，与上述两篇构成「审核 → 执行 → 回执」闭环）
+- **G4 双臂验收终判**：`docs/06-verification/G4-dualarm-verdict-20260910.md`（S1 gate-off 性能等价 PASS：|Δ|=0.434 ≤ F=4.88；含 mean/median 背离与 token 比对负结果的诚实标注）
+- **参数组合门禁判定**：`docs/02-performance-benchmarks/gate-combo-verdict-20260910.md`（唯一通过组合 = batch4096 × k6 × thr0，其余 11 组合逐一定谳）
+- **接受率护栏**：`docs/06-verification/accept-rate-cheat-detection-2026-09-10.md`（回顾性接纳五判别量 D1-D5 + 现场一行判定规则）
 - **脱敏映射**：`REDACTION-MAP.md`（沿用 master 规则）
 
 ## 📄 License
